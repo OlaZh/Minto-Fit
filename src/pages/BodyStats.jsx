@@ -99,7 +99,7 @@ export default function BodyStats() {
     <div className="p-4 space-y-6 pb-8">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate('/progress')} className="text-zinc-400 text-2xl leading-none">‹</button>
-        <h1 className="text-xl font-semibold">Заміри тіла</h1>
+        <h1 className="text-xl font-semibold">Зміни</h1>
       </div>
 
       {/* Chart */}

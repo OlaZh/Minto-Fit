@@ -1115,6 +1115,24 @@
           <path d="M12 5v14M5 12h14" />
         </Ico>
       );
+      const IcoUser = (p) => (
+        <Ico {...p}>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+        </Ico>
+      );
+      const IcoPhoto = (p) => (
+        <Ico {...p}>
+          <rect x="2" y="6" width="20" height="14" rx="2.5" />
+          <circle cx="12" cy="13" r="3.5" />
+          <path d="M8 6l1.5-2h5L16 6" />
+        </Ico>
+      );
+      const IcoDrop = (p) => (
+        <Ico {...p}>
+          <path d="M12 2C12 2 5 9.5 5 14a7 7 0 0 0 14 0C19 9.5 12 2 12 2Z" />
+        </Ico>
+      );
 
       // ── Data ──────────────────────────────────────────────────────────────────
       const PROGRAMS = [
@@ -1968,6 +1986,11 @@
         const [openAlt, setOpenAlt] = useState({});
         const [openNote, setOpenNote] = useState({});
         const [notes, setNotes] = useState({});
+        const [extraSetCounts, setExtraSetCounts] = useState({});
+        const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false });
+        const [rpe, setRpe] = useState({});
+        const [openMenu, setOpenMenu] = useState({});
+        const [replacedWith, setReplacedWith] = useState({});
 
         useEffect(() => {
           const t = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -1980,7 +2003,10 @@
               setRest((r) => {
                 if (!r.active) return r;
                 const next = r.remaining - 1;
-                if (next <= 0) return { active: false, total: 0, remaining: 0 };
+                if (next <= 0) {
+                  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                  return { active: false, total: 0, remaining: 0 };
+                }
                 return { ...r, remaining: next };
               }),
             1000,
@@ -1988,18 +2014,39 @@
           return () => clearInterval(t);
         }, [rest.active]);
 
+        useEffect(() => {
+          let wakeLock = null;
+          const acquire = async () => {
+            try {
+              if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+            } catch(e) {}
+          };
+          acquire();
+          const onVisible = () => { if (document.visibilityState === 'visible') acquire(); };
+          document.addEventListener('visibilitychange', onVisible);
+          return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            if (wakeLock) wakeLock.release();
+          };
+        }, []);
+
         const toggleSet = (exId, idx, restSec) => {
           const key = `${exId}:${idx}`;
           const cur = setData[key];
           setSetData((s) => ({ ...s, [key]: { ...cur, done: !cur.done } }));
           if (!cur.done && restSec > 0)
             setRest({ active: true, total: restSec, remaining: restSec });
-          // Vibrate if available
           if (!cur.done && navigator.vibrate) navigator.vibrate(40);
         };
         const updateSet = (exId, idx, field, val) => {
           const key = `${exId}:${idx}`;
           setSetData((s) => ({ ...s, [key]: { ...s[key], [field]: val } }));
+        };
+        const addSet = (exId, templateSet) => {
+          const existing = Object.keys(setData).filter(k => k.startsWith(`${exId}:`));
+          const newIdx = existing.length;
+          setSetData(s => ({ ...s, [`${exId}:${newIdx}`]: { weight: templateSet.weight || 0, reps: templateSet.reps || 0, done: false } }));
+          setExtraSetCounts(c => ({ ...c, [exId]: (c[exId] || 0) + 1 }));
         };
 
         const total = Object.keys(setData).length;
@@ -2120,12 +2167,58 @@
               </div>
             )}
 
+            {/* Cardio warm-up block */}
+            <div className="px" style={{ marginBottom: 4 }}>
+              <div className="card" style={{ padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 20 }}>🏃</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: cardio.done ? 'var(--text-3)' : 'var(--text)', textDecoration: cardio.done ? 'line-through' : 'none' }}>Кардіо розминка</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        <select
+                          value={cardio.type}
+                          onChange={e => setCardio(c => ({ ...c, type: e.target.value }))}
+                          style={{ appearance: 'none', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: 'var(--text)', fontFamily: 'inherit', cursor: 'pointer' }}
+                        >
+                          {['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <input
+                            type="number"
+                            value={cardio.duration}
+                            onChange={e => setCardio(c => ({ ...c, duration: Number(e.target.value) || 0 }))}
+                            style={{ width: 48, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 6px', fontSize: 12, color: 'var(--text)', textAlign: 'center', fontFamily: 'inherit' }}
+                          />
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>хв</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    className="set-check"
+                    data-done={cardio.done ? '1' : '0'}
+                    onClick={() => setCardio(c => ({ ...c, done: !c.done }))}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {cardio.done && <IcoCheck size={16} sw={2.6} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Exercises */}
             <div className="px stack" style={{ gap: 12 }}>
               {program.exercises.map((ex, idx) => {
-                const allDone = ex.sets.every(
-                  (_, i) => setData[`${ex.id}:${i}`]?.done,
-                );
+                const extraCount = extraSetCounts[ex.id] || 0;
+                const totalSets = ex.sets.length + extraCount;
+                const allDone = Array.from({ length: totalSets }, (_, i) => setData[`${ex.id}:${i}`]?.done).every(Boolean);
+                const isReplaced = !!replacedWith[ex.id];
+                const displayName = isReplaced ? ex.alt : ex.name;
+                const displayMachine = isReplaced ? 'Замінена вправа' : ex.machine;
+                const hasWeight = ex.sets[0]?.w > 0;
+                const warmupWeight = hasWeight ? Math.round(ex.sets[0].w * 0.5) : 0;
+
                 return (
                   <div
                     key={ex.id}
@@ -2134,43 +2227,47 @@
                   >
                     {/* Head */}
                     <div className="ex-head">
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 12,
-                          alignItems: "flex-start",
-                          flex: 1,
-                        }}
-                      >
+                      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flex: 1 }}>
                         <div className="ex-machine-photo">
-                          <IcoDumbbell
-                            size={24}
-                            style={{ color: "var(--text-3)" }}
-                          />
+                          <IcoDumbbell size={24} style={{ color: "var(--text-3)" }} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="ex-name">{ex.name}</div>
-                          <div className="ex-note">{ex.machine}</div>
-                          {ex.note && (
-                            <div
-                              className="ex-note"
-                              style={{
-                                marginTop: 2,
-                                color: "var(--text-4)",
-                                fontSize: 11,
-                              }}
-                            >
+                          <div className="ex-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {displayName}
+                            {isReplaced && <span style={{ fontSize: 10, background: 'rgba(198,255,61,0.15)', color: 'var(--accent)', padding: '2px 6px', borderRadius: 6, fontWeight: 600 }}>ЗАМІНА</span>}
+                          </div>
+                          <div className="ex-note">{displayMachine}</div>
+                          {!isReplaced && ex.note && (
+                            <div className="ex-note" style={{ marginTop: 2, color: "var(--text-4)", fontSize: 11 }}>
                               💡 {ex.note}
                             </div>
                           )}
                         </div>
                       </div>
-                      <button
-                        className="icon-btn"
-                        style={{ width: 32, height: 32, borderRadius: 10 }}
-                      >
-                        <IcoMore size={16} />
-                      </button>
+                      {/* ⋯ menu */}
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          className="icon-btn"
+                          style={{ width: 32, height: 32, borderRadius: 10 }}
+                          onClick={() => setOpenMenu(m => ({ ...m, [ex.id]: !m[ex.id] }))}
+                        >
+                          <IcoMore size={16} />
+                        </button>
+                        {openMenu[ex.id] && (
+                          <div style={{ position: 'absolute', right: 0, top: 38, background: 'var(--surface-2)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: 6, zIndex: 20, minWidth: 170, display: 'flex', flexDirection: 'column', gap: 2 }}
+                            onMouseLeave={() => setOpenMenu(m => ({ ...m, [ex.id]: false }))}
+                          >
+                            <button className="ex-action-btn" style={{ justifyContent: 'flex-start', width: '100%' }}
+                              onClick={() => { alert('Фото буде додано після підключення бази вправ'); setOpenMenu({}); }}>
+                              <IcoPhoto size={14} /> Фото тренажера
+                            </button>
+                            <button className="ex-action-btn" style={{ justifyContent: 'flex-start', width: '100%' }}
+                              onClick={() => { if (ex.youtube) window.open(ex.youtube, '_blank'); else alert('Відео ще не додано для цієї вправи'); setOpenMenu({}); }}>
+                              <IcoYoutube size={14} /> Відео техніки
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Sets table */}
@@ -2182,52 +2279,46 @@
                         <div>Повт.</div>
                         <div />
                       </div>
-                      {ex.sets.map((s, i) => {
+
+                      {/* Warm-up row — auto 50% */}
+                      {hasWeight && (
+                        <div className="ex-row" style={{ opacity: 0.55 }}>
+                          <div className="set-num" style={{ background: 'var(--surface-3)', fontSize: 10, color: 'var(--text-3)' }}>W</div>
+                          <div className="set-last" style={{ fontSize: 11 }}>розминка</div>
+                          <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{warmupWeight}</div>
+                          <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>10</div>
+                          <div />
+                        </div>
+                      )}
+
+                      {Array.from({ length: totalSets }, (_, i) => {
+                        const template = i < ex.sets.length ? ex.sets[i] : ex.sets[ex.sets.length - 1];
                         const key = `${ex.id}:${i}`;
-                        const st = setData[key];
+                        const st = setData[key] || { weight: template.w, reps: template.r, done: false };
+                        const isExtra = i >= ex.sets.length;
                         return (
-                          <div
-                            key={i}
-                            className="ex-row"
-                            data-done={st.done ? "1" : "0"}
-                          >
-                            <div className="set-num">{i + 1}</div>
+                          <div key={i} className="ex-row" data-done={st.done ? "1" : "0"}>
+                            <div className="set-num" style={isExtra ? { background: 'rgba(198,255,61,0.12)', color: 'var(--accent)' } : {}}>
+                              {isExtra ? '+' : i + 1}
+                            </div>
                             <div className="set-last">
-                              {s.w > 0
-                                ? `${s.w}×${s.r}`
-                                : s.r > 60
-                                  ? `${s.r}хв`
-                                  : `${s.r}повт`}
+                              {template.w > 0 ? `${template.w}×${template.r}` : template.r > 60 ? `${template.r}хв` : `${template.r}повт`}
                             </div>
                             <input
                               className="set-input"
                               type="text"
                               inputMode="decimal"
                               value={st.weight || ""}
-                              placeholder={s.w > 0 ? String(s.w) : "—"}
-                              onChange={(e) =>
-                                updateSet(
-                                  ex.id,
-                                  i,
-                                  "weight",
-                                  Number(e.target.value.replace(",", ".")) || 0,
-                                )
-                              }
+                              placeholder={template.w > 0 ? String(template.w) : "—"}
+                              onChange={(e) => updateSet(ex.id, i, "weight", Number(e.target.value.replace(",", ".")) || 0)}
                             />
                             <input
                               className="set-input"
                               type="text"
                               inputMode="numeric"
                               value={st.reps || ""}
-                              placeholder={String(s.r)}
-                              onChange={(e) =>
-                                updateSet(
-                                  ex.id,
-                                  i,
-                                  "reps",
-                                  Number(e.target.value) || 0,
-                                )
-                              }
+                              placeholder={String(template.r)}
+                              onChange={(e) => updateSet(ex.id, i, "reps", Number(e.target.value) || 0)}
                             />
                             <button
                               className="set-check"
@@ -2241,33 +2332,23 @@
                       })}
                     </div>
 
-                    {/* Footer — YouTube, Notes, Alt */}
+                    {/* Footer — Notes, +підхід, Замінити */}
                     <div className="ex-footer">
-                      {ex.youtube && (
-                        <button
-                          className="ex-action-btn"
-                          onClick={() => window.open(ex.youtube, "_blank")}
-                        >
-                          <IcoYoutube size={13} /> Відео
-                        </button>
-                      )}
-                      <button
-                        className="ex-action-btn"
-                        onClick={() =>
-                          setOpenNote((n) => ({ ...n, [ex.id]: !n[ex.id] }))
-                        }
-                      >
+                      <button className="ex-action-btn" onClick={() => setOpenNote((n) => ({ ...n, [ex.id]: !n[ex.id] }))}>
                         <IcoNote size={13} /> Нотатки
                       </button>
+                      <button className="ex-action-btn" onClick={() => {
+                        const lastTemplate = ex.sets[ex.sets.length - 1];
+                        const lastKey = `${ex.id}:${ex.sets.length + (extraSetCounts[ex.id] || 0) - 1}`;
+                        const lastSt = setData[lastKey] || { weight: lastTemplate.w, reps: lastTemplate.r };
+                        addSet(ex.id, lastSt);
+                      }}
+                        style={{ color: 'var(--accent)', borderColor: 'rgba(198,255,61,0.3)', background: 'rgba(198,255,61,0.06)' }}>
+                        <IcoPlus size={13} /> Підхід
+                      </button>
                       {ex.alt && (
-                        <button
-                          className="ex-action-btn"
-                          onClick={() =>
-                            setOpenAlt((a) => ({ ...a, [ex.id]: !a[ex.id] }))
-                          }
-                        >
-                          <IcoSwap size={13} />{" "}
-                          {openAlt[ex.id] ? "Закрити" : "Замінити"}
+                        <button className="ex-action-btn" onClick={() => setReplacedWith(r => ({ ...r, [ex.id]: !r[ex.id] }))}>
+                          <IcoSwap size={13} /> {isReplaced ? 'Повернутись' : 'Замінити'}
                         </button>
                       )}
                     </div>
@@ -2275,46 +2356,30 @@
                     {/* Notes panel */}
                     {openNote[ex.id] && (
                       <div className="note-panel">
-                        <div className="label" style={{ marginBottom: 6 }}>
-                          Мої налаштування
-                        </div>
+                        <div className="label" style={{ marginBottom: 6 }}>Мої налаштування</div>
                         <textarea
                           className="note-input"
                           rows={2}
                           placeholder="Висота сидіння, позиція валиків…"
                           value={notes[ex.id] || ""}
-                          onChange={(e) =>
-                            setNotes((n) => ({ ...n, [ex.id]: e.target.value }))
-                          }
+                          onChange={(e) => setNotes((n) => ({ ...n, [ex.id]: e.target.value }))}
                         />
                       </div>
                     )}
 
-                    {/* Alt panel */}
-                    {openAlt[ex.id] && ex.alt && (
-                      <div className="alt-panel">
-                        <div className="label" style={{ marginBottom: 6 }}>
-                          Альтернатива
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                          }}
-                        >
-                          <div
-                            className="ex-machine-photo"
-                            style={{ width: 36, height: 36 }}
-                          >
-                            <IcoSwap
-                              size={18}
-                              style={{ color: "var(--text-3)" }}
-                            />
-                          </div>
-                          <div style={{ fontSize: 14, color: "var(--text-2)" }}>
-                            {ex.alt}
-                          </div>
+                    {/* RPE — показується коли всі підходи виконані */}
+                    {allDone && (
+                      <div style={{ padding: '10px 18px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Як було?</span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {[['🟢', 'легко'], ['🟡', 'норм'], ['🔴', 'важко']].map(([icon, label]) => (
+                            <button key={icon}
+                              onClick={() => setRpe(r => ({ ...r, [ex.id]: r[ex.id] === icon ? null : icon }))}
+                              style={{ fontSize: 18, padding: '4px 10px', borderRadius: 10, background: rpe[ex.id] === icon ? 'var(--surface-3)' : 'transparent', border: `1.5px solid ${rpe[ex.id] === icon ? 'var(--border-bright)' : 'var(--border)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, lineHeight: 1 }}>
+                              {icon}
+                              <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{label}</span>
+                            </button>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -2477,12 +2542,22 @@
 
       function ProgressScreen() {
         const [activeStat, setActiveStat] = useState("weight");
-        const statKeys = [
+        const [showAllStats, setShowAllStats] = useState(false);
+        const mainStatKeys = [
+          { id: "weight", label: "Вага" },
+        ];
+        const allStatKeys = [
           { id: "weight", label: "Вага" },
           { id: "waist", label: "Талія" },
           { id: "hips", label: "Стегна" },
           { id: "chest", label: "Груди" },
+          { id: "left_thigh", label: "Ліве стегно" },
+          { id: "right_thigh", label: "Праве стегно" },
+          { id: "left_arm", label: "Ліва рука" },
+          { id: "right_arm", label: "Права рука" },
+          { id: "wrist", label: "Зап'ясток" },
         ];
+        const statKeys = showAllStats ? allStatKeys : mainStatKeys;
         const statData = BODY_STATS.map((d) => ({
           date: d.date,
           value: d[activeStat],
@@ -2614,33 +2689,18 @@
               <div className="card">
                 <div className="card-row" style={{ marginBottom: 12 }}>
                   <div>
-                    <div className="h-3">Заміри тіла</div>
-                    <div className="meta" style={{ marginTop: 2 }}>
-                      6 місяців
-                    </div>
+                    <div className="h-3">Зміни</div>
+                    <div className="meta" style={{ marginTop: 2 }}>6 місяців</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div
-                      className="num"
-                      style={{ fontSize: 22, fontWeight: 600 }}
-                    >
+                    <div className="num" style={{ fontSize: 22, fontWeight: 600 }}>
                       {statData[statData.length - 1]?.value}
-                      <span
-                        style={{
-                          fontSize: 13,
-                          color: "var(--text-3)",
-                          marginLeft: 3,
-                        }}
-                      >
+                      <span style={{ fontSize: 13, color: "var(--text-3)", marginLeft: 3 }}>
                         {activeStat === "weight" ? "кг" : "см"}
                       </span>
                     </div>
                     <div className="meta stat-up" style={{ fontSize: 12 }}>
-                      ↓{" "}
-                      {(
-                        statData[0]?.value -
-                        statData[statData.length - 1]?.value
-                      ).toFixed(1)}
+                      ↓ {(statData[0]?.value - statData[statData.length - 1]?.value).toFixed(1)}
                       {activeStat === "weight" ? "кг" : "см"}
                     </div>
                   </div>
@@ -2657,6 +2717,13 @@
                       {k.label}
                     </button>
                   ))}
+                  <button
+                    className="stat-chip"
+                    onClick={() => { setShowAllStats(v => !v); setActiveStat('weight'); }}
+                    style={{ borderStyle: 'dashed' }}
+                  >
+                    {showAllStats ? '↑ Згорнути' : '+ Інші заміри'}
+                  </button>
                 </div>
                 {/* Chart */}
                 <BodyLineChart data={statData} />
@@ -2827,7 +2894,15 @@
 
         return (
           <div className="screen">
-            <Topbar title="Програми" subtitle={`${PROGRAMS.length} програм`} />
+            <Topbar
+              title="Програми"
+              subtitle={`${PROGRAMS.length} програм`}
+              right={
+                <button className="icon-btn" title="Профіль">
+                  <IcoUser size={18} />
+                </button>
+              }
+            />
             <div className="px stack" style={{ paddingTop: 6, gap: 20 }}>
               <ProgramSection
                 title="Основні — 4 дні на тиждень"
@@ -2926,11 +3001,10 @@
                       Переглянути
                     </button>
                     <button
-                      className="btn btn-primary btn-sm"
+                      className="btn btn-ghost btn-sm"
                       style={{ flex: 1 }}
-                      onClick={() => onStart(p)}
                     >
-                      <IcoPlay size={14} sw={2} /> Почати
+                      Редагувати
                     </button>
                   </div>
                 </div>

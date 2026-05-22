@@ -29,7 +29,12 @@ export default function Programs() {
 
   return (
     <div className="p-4 space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Програми</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Програми</h1>
+        <button className="w-9 h-9 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-400 text-lg">
+          👤
+        </button>
+      </div>
 
       {programs.length === 0 && (
         <p className="text-zinc-500 text-sm">Програм ще немає</p>

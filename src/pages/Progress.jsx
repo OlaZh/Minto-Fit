@@ -145,8 +145,8 @@ export default function Progress() {
         className="w-full flex items-center justify-between bg-zinc-900 rounded-2xl px-4 py-4"
       >
         <div>
-          <p className="font-medium text-zinc-100">Заміри тіла</p>
-          <p className="text-sm text-zinc-500">Вага, талія, стегна...</p>
+          <p className="font-medium text-zinc-100">Зміни</p>
+          <p className="text-sm text-zinc-500">Вага, заміри тіла, графіки</p>
         </div>
         <span className="text-zinc-600 text-lg">›</span>
       </button>
