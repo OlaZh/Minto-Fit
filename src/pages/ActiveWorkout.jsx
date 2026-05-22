@@ -22,6 +22,7 @@ export default function ActiveWorkout() {
   const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false })
   const [rpe, setRpe] = useState({})                    // exId → '🟢'|'🟡'|'🔴'
   const [replacedExercises, setReplacedExercises] = useState({}) // exId → altExercise object
+  const [originalSets, setOriginalSets] = useState({})           // exId → sets before replacement
   const [menuOpen, setMenuOpen] = useState(false)
   const [noteOpen, setNoteOpen] = useState(false)
 
@@ -88,14 +89,19 @@ export default function ActiveWorkout() {
         const exIds = exList.map(e => e.exercise.id)
         const { data: altRows } = await supabase
           .from('mf_alternative_exercises')
-          .select('exercise_id, alt:mf_exercises!alternative_exercise_id(id, name, youtube_url, machine_photo_url, personal_note, description)')
+          .select('exercise_id, alt_default_sets, alt_default_reps, alt_default_weight, alt:mf_exercises!alternative_exercise_id(id, name, youtube_url, machine_photo_url, personal_note, description)')
           .in('exercise_id', exIds)
 
         if (altRows?.length) {
           const altMap = {}
           altRows.forEach(r => {
             if (!altMap[r.exercise_id]) altMap[r.exercise_id] = []
-            if (r.alt) altMap[r.exercise_id].push(r.alt)
+            if (r.alt) altMap[r.exercise_id].push({
+              ...r.alt,
+              altDefaultSets: r.alt_default_sets,
+              altDefaultReps: r.alt_default_reps,
+              altDefaultWeight: r.alt_default_weight,
+            })
           })
           exList.forEach(e => { e.alternatives = altMap[e.exercise.id] ?? [] })
         }
@@ -345,12 +351,29 @@ export default function ActiveWorkout() {
           <div className="flex items-center gap-2 shrink-0">
             {cur.alternatives.length > 0 && (
               <button
-                onClick={() => setReplacedExercises(r => {
-                  const next = { ...r }
-                  if (next[cur.exercise.id]) delete next[cur.exercise.id]
-                  else next[cur.exercise.id] = cur.alternatives[0]
-                  return next
-                })}
+                onClick={() => {
+                  const alt = cur.alternatives[0]
+                  if (isReplaced) {
+                    setReplacedExercises(r => { const n = { ...r }; delete n[cur.exercise.id]; return n })
+                    setExercises(prev => prev.map((e, i) =>
+                      i !== currentIdx ? e : { ...e, sets: originalSets[e.exercise.id] ?? e.sets }
+                    ))
+                    setOriginalSets(o => { const n = { ...o }; delete n[cur.exercise.id]; return n })
+                  } else {
+                    setOriginalSets(o => ({ ...o, [cur.exercise.id]: cur.sets }))
+                    setReplacedExercises(r => ({ ...r, [cur.exercise.id]: alt }))
+                    setExercises(prev => prev.map((e, i) =>
+                      i !== currentIdx ? e : {
+                        ...e,
+                        sets: Array.from({ length: alt.altDefaultSets ?? 3 }, () => ({
+                          weight: alt.altDefaultWeight ?? 0,
+                          reps: alt.altDefaultReps ?? 12,
+                          completed: false,
+                        }))
+                      }
+                    ))
+                  }
+                }}
                 className="text-xs text-zinc-400 border border-zinc-700 px-2 py-1 rounded-lg"
               >
                 {isReplaced ? 'Повернутись' : '⇄ Замінити'}
