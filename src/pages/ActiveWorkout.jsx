@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const REST_SECONDS = 90
+
+  function fmtTime(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0')
+  const s = (seconds % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+function formatProgramTitle(name = '') {
+  return name
+    .replace(/\s+—\s+/g, ' · ')
+    .toUpperCase()
+}
 
 export default function ActiveWorkout() {
   const { programId } = useParams()
@@ -13,24 +25,23 @@ export default function ActiveWorkout() {
   const [exercises, setExercises] = useState([])
   const [prevSets, setPrevSets] = useState({})
   const [workoutId, setWorkoutId] = useState(null)
-  const [currentIdx, setCurrentIdx] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [rest, setRest] = useState(null)
-  const [finishing, setFinishing] = useState(false)
-
-  // Нові стани
+  const [confirmFinish, setConfirmFinish] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [selectedMood, setSelectedMood] = useState('💪')
   const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false })
-  const [rpe, setRpe] = useState({})                    // exId → '🟢'|'🟡'|'🔴'
-  const [replacedExercises, setReplacedExercises] = useState({}) // exId → altExercise object
-  const [originalSets, setOriginalSets] = useState({})           // exId → sets before replacement
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [noteOpen, setNoteOpen] = useState(false)
+  const [rpe, setRpe] = useState({})
+  const [replacedExercises, setReplacedExercises] = useState({})
+  const [originalSets, setOriginalSets] = useState({})
+  const [menuExerciseId, setMenuExerciseId] = useState(null)
+  const [menuSection, setMenuSection] = useState(null)
+  const [editingCell, setEditingCell] = useState(null)
 
   const wakeLockRef = useRef(null)
   const elapsedRef = useRef(null)
   const restRef = useRef(null)
 
-  // ── Load ──────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       const { data: user } = await supabase.auth.getUser()
@@ -56,7 +67,6 @@ export default function ActiveWorkout() {
 
       setProgram(prog)
 
-      // Минулі підходи
       let prev = {}
       if (lastWorkout) {
         const { data: lastSets } = await supabase
@@ -64,9 +74,9 @@ export default function ActiveWorkout() {
           .select('exercise_id, weight, reps, set_number')
           .eq('workout_id', lastWorkout.id)
           .order('set_number')
-        ;(lastSets ?? []).forEach(s => {
-          if (!prev[s.exercise_id]) prev[s.exercise_id] = []
-          prev[s.exercise_id].push({ weight: s.weight, reps: s.reps })
+        ;(lastSets ?? []).forEach(set => {
+          if (!prev[set.exercise_id]) prev[set.exercise_id] = []
+          prev[set.exercise_id].push({ weight: set.weight, reps: set.reps })
         })
       }
       setPrevSets(prev)
@@ -84,9 +94,8 @@ export default function ActiveWorkout() {
         })),
       }))
 
-      // Завантажуємо альтернативи
       if (exList.length > 0) {
-        const exIds = exList.map(e => e.exercise.id)
+        const exIds = exList.map(item => item.exercise.id)
         const { data: altRows } = await supabase
           .from('mf_alternative_exercises')
           .select('exercise_id, alt_default_sets, alt_default_reps, alt_default_weight, alt:mf_exercises!alternative_exercise_id(id, name, youtube_url, machine_photo_url, personal_note, description)')
@@ -94,44 +103,52 @@ export default function ActiveWorkout() {
 
         if (altRows?.length) {
           const altMap = {}
-          altRows.forEach(r => {
-            if (!altMap[r.exercise_id]) altMap[r.exercise_id] = []
-            if (r.alt) altMap[r.exercise_id].push({
-              ...r.alt,
-              altDefaultSets: r.alt_default_sets,
-              altDefaultReps: r.alt_default_reps,
-              altDefaultWeight: r.alt_default_weight,
-            })
+          altRows.forEach(row => {
+            if (!altMap[row.exercise_id]) altMap[row.exercise_id] = []
+            if (row.alt) {
+              altMap[row.exercise_id].push({
+                ...row.alt,
+                altDefaultSets: row.alt_default_sets,
+                altDefaultReps: row.alt_default_reps,
+                altDefaultWeight: row.alt_default_weight,
+              })
+            }
           })
-          exList.forEach(e => { e.alternatives = altMap[e.exercise.id] ?? [] })
+          exList.forEach(item => {
+            item.alternatives = altMap[item.exercise.id] ?? []
+          })
         }
       }
 
       setExercises(exList)
 
-      // Створюємо запис тренування
-      const { data: wk } = await supabase
+      const { data: workout } = await supabase
         .from('mf_workouts')
         .insert({ user_id: uid, program_id: programId })
         .select('id')
         .single()
-      setWorkoutId(wk.id)
+      setWorkoutId(workout.id)
 
       setLoading(false)
     }
+
     load()
   }, [programId])
 
-  // ── Wake Lock ─────────────────────────────────────────────
   useEffect(() => {
     const acquire = async () => {
       try {
-        if ('wakeLock' in navigator)
+        if ('wakeLock' in navigator) {
           wakeLockRef.current = await navigator.wakeLock.request('screen')
+        }
       } catch {}
     }
+
     acquire()
-    const onVisible = () => { if (document.visibilityState === 'visible') acquire() }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') acquire()
+    }
+
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       document.removeEventListener('visibilitychange', onVisible)
@@ -139,14 +156,12 @@ export default function ActiveWorkout() {
     }
   }, [])
 
-  // ── Elapsed ───────────────────────────────────────────────
   useEffect(() => {
     if (loading) return
-    elapsedRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+    elapsedRef.current = setInterval(() => setElapsed(value => value + 1), 1000)
     return () => clearInterval(elapsedRef.current)
   }, [loading])
 
-  // ── Rest timer ────────────────────────────────────────────
   useEffect(() => {
     if (rest === null) return
     if (rest === 0) {
@@ -155,7 +170,8 @@ export default function ActiveWorkout() {
       setRest(null)
       return
     }
-    restRef.current = setTimeout(() => setRest(r => r - 1), 1000)
+
+    restRef.current = setTimeout(() => setRest(value => value - 1), 1000)
     return () => clearTimeout(restRef.current)
   }, [rest])
 
@@ -174,474 +190,690 @@ export default function ActiveWorkout() {
     } catch {}
   }
 
-  function fmtTime(s) {
-    const m = Math.floor(s / 60).toString().padStart(2, '0')
-    const ss = (s % 60).toString().padStart(2, '0')
-    return `${m}:${ss}`
-  }
-
-  // ── Set actions ───────────────────────────────────────────
   function updateSet(exIdx, setIdx, field, value) {
-    setExercises(prev => prev.map((e, i) =>
-      i !== exIdx ? e : { ...e, sets: e.sets.map((s, j) => j === setIdx ? { ...s, [field]: value } : s) }
-    ))
+    setExercises(prev => prev.map((exercise, i) => (
+      i !== exIdx
+        ? exercise
+        : {
+            ...exercise,
+            sets: exercise.sets.map((set, j) => (
+              j === setIdx ? { ...set, [field]: value } : set
+            )),
+          }
+    )))
   }
 
   function adjustWeight(exIdx, setIdx, delta) {
-    const val = exercises[exIdx].sets[setIdx].weight
-    updateSet(exIdx, setIdx, 'weight', Math.max(0, +(val + delta).toFixed(1)))
+    const value = exercises[exIdx].sets[setIdx].weight
+    updateSet(exIdx, setIdx, 'weight', Math.max(0, +(value + delta).toFixed(1)))
   }
 
   function adjustReps(exIdx, setIdx, delta) {
-    const val = exercises[exIdx].sets[setIdx].reps
-    updateSet(exIdx, setIdx, 'reps', Math.max(1, val + delta))
+    const value = exercises[exIdx].sets[setIdx].reps
+    updateSet(exIdx, setIdx, 'reps', Math.max(1, value + delta))
   }
 
   function addSet(exIdx) {
-    setExercises(prev => prev.map((e, i) => {
-      if (i !== exIdx) return e
-      const last = e.sets[e.sets.length - 1]
-      return { ...e, sets: [...e.sets, { weight: last?.weight ?? 0, reps: last?.reps ?? 10, completed: false }] }
+    setExercises(prev => prev.map((exercise, i) => {
+      if (i !== exIdx) return exercise
+      const last = exercise.sets[exercise.sets.length - 1]
+      return {
+        ...exercise,
+        sets: [
+          ...exercise.sets,
+          {
+            weight: last?.weight ?? 0,
+            reps: last?.reps ?? 10,
+            completed: false,
+          },
+        ],
+      }
     }))
+  }
+
+  function startEditing(exerciseId, setIdx, field) {
+    setEditingCell({ exerciseId, setIdx, field })
+  }
+
+  function stopEditing() {
+    setEditingCell(null)
+  }
+
+  function parseCellValue(field, rawValue, fallback) {
+    if (field === 'weight') {
+      const value = Number(rawValue.replace(',', '.'))
+      return Number.isNaN(value) ? fallback : Math.max(0, value)
+    }
+
+    const value = Number(rawValue)
+    return Number.isNaN(value) ? fallback : Math.max(1, Math.round(value))
   }
 
   async function completeSet(exIdx, setIdx) {
     updateSet(exIdx, setIdx, 'completed', true)
     setRest(REST_SECONDS)
     if (!workoutId) return
-    const s = exercises[exIdx].sets[setIdx]
-    const displayEx = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
+
+    const set = exercises[exIdx].sets[setIdx]
+    const displayExercise = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
+
     supabase.from('mf_workout_sets').insert({
       workout_id: workoutId,
-      exercise_id: displayEx.id,
+      exercise_id: displayExercise.id,
       set_number: setIdx + 1,
-      weight: s.weight,
-      reps: s.reps,
+      weight: set.weight,
+      reps: set.reps,
       completed: true,
     })
   }
 
   async function finishWorkout(intensity) {
     if (!workoutId) return
+
     const calories = Math.round(
       ({ важко: 8, нормально: 6, легко: 4 }[intensity] ?? 6) * 70 * (elapsed / 3600)
     )
-    await supabase.from('mf_workouts').update({
-      finished_at: new Date().toISOString(),
-      duration_minutes: Math.round(elapsed / 60),
-      intensity,
-      calories_burned: calories,
-    }).eq('id', workoutId)
+
+    await supabase
+      .from('mf_workouts')
+      .update({
+        finished_at: new Date().toISOString(),
+        duration_minutes: Math.round(elapsed / 60),
+        intensity,
+        calories_burned: calories,
+      })
+      .eq('id', workoutId)
+
     wakeLockRef.current?.release()
     navigate('/')
   }
 
-  // ── Render ────────────────────────────────────────────────
-  if (loading) return <div className="p-6 text-zinc-500">Завантаження...</div>
+  function requestFinish() {
+    if (allDone) {
+      setSummaryOpen(true)
+      return
+    }
+    setConfirmFinish(true)
+  }
 
-  const cur = exercises[currentIdx]
-  if (!cur) return null
+  if (loading) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
 
-  const allDone = exercises.every(e => e.sets.every(s => s.completed))
-  const curAllDone = cur.sets.every(s => s.completed)
-  const displayEx = replacedExercises[cur.exercise.id] ?? cur.exercise
-  const isReplaced = !!replacedExercises[cur.exercise.id]
-  const warmupWeight = cur.defaultWeight > 0 ? Math.round(cur.defaultWeight * 0.5) : 0
+  const allDone = exercises.every(exercise => exercise.sets.every(set => set.completed))
+  const completedSets = exercises.reduce(
+    (total, exercise) => total + exercise.sets.filter(set => set.completed).length,
+    0,
+  )
+  const totalSets = exercises.reduce((total, exercise) => total + exercise.sets.length, 0)
+  const progress = totalSets ? Math.round((completedSets / totalSets) * 100) : 0
+  const totalVolume = exercises.reduce(
+    (sum, exercise) => sum + exercise.sets.filter(set => set.completed).reduce((acc, set) => acc + set.weight * set.reps, 0),
+    0,
+  )
+  const burnedCalories = Math.round((elapsed / 60) * 5.4)
+  const menuExercise = exercises.find(exercise => exercise.exercise.id === menuExerciseId)
+  const menuDisplayExercise = menuExercise
+    ? (replacedExercises[menuExercise.exercise.id] ?? menuExercise.exercise)
+    : null
+
+  if (summaryOpen) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top stack" style={{ gap: 24, justifyContent: 'space-between', minHeight: '100%' }}>
+          <div className="stack" style={{ gap: 24 }}>
+            <div className="card-row" style={{ alignItems: 'flex-start' }}>
+              <div>
+                <div className="label">Тренування завершено</div>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => navigate('/')}>✕</button>
+            </div>
+
+            <div className="summary-check">✓</div>
+
+            <div style={{ textAlign: 'center' }}>
+              <div className="h-1" style={{ marginBottom: 8 }}>Чудова робота!</div>
+              <div className="meta">{program?.name ?? 'Тренування'}</div>
+            </div>
+
+            <div className="summary-grid">
+              <div className="summary-stat">
+                <div className="label" style={{ marginBottom: 14 }}>Тривалість</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 700 }}>
+                  {Math.max(1, Math.round(elapsed / 60))}
+                  <span style={{ fontSize: 15, color: 'var(--text-3)', marginLeft: 4 }}>хв</span>
+                </div>
+              </div>
+              <div className="summary-stat">
+                <div className="label" style={{ marginBottom: 14 }}>Підходи</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 700 }}>
+                  {completedSets}
+                  <span style={{ fontSize: 15, color: 'var(--text-3)', marginLeft: 4 }}>/ {totalSets}</span>
+                </div>
+              </div>
+              <div className="summary-stat">
+                <div className="label" style={{ marginBottom: 14 }}>Об'єм</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 700 }}>
+                  {totalVolume}
+                  <span style={{ fontSize: 15, color: 'var(--text-3)', marginLeft: 4 }}>кг</span>
+                </div>
+              </div>
+              <div className="summary-stat summary-stat--accent">
+                <div className="label" style={{ marginBottom: 14, color: 'var(--accent)' }}>≈ Спалено</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>
+                  {burnedCalories}
+                  <span style={{ fontSize: 15, marginLeft: 4 }}>ккал</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="stack" style={{ gap: 12 }}>
+              <div className="label" style={{ textAlign: 'center' }}>Як відчувалось?</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                {[
+                  { key: 'важко', label: 'Важко', icon: '😤' },
+                  { key: 'нормально', label: 'Нормально', icon: '💪' },
+                  { key: 'легко', label: 'Легко', icon: '🌿' },
+                ].map(option => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    className="emoji-choice"
+                    data-active={selectedMood === option.icon ? '1' : '0'}
+                    onClick={() => setSelectedMood(option.icon)}
+                  >
+                    <span style={{ fontSize: 30 }}>{option.icon}</span>
+                    <span className="meta" style={{ fontSize: 12 }}>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={() => {
+              const intensityByMood = {
+                '😤': 'важко',
+                '💪': 'нормально',
+                '🌿': 'легко',
+              }
+              finishWorkout(intensityByMood[selectedMood] ?? 'нормально')
+            }}
+          >
+            На головну
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen flex flex-col">
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+    <div className="screen screen--no-nav">
+      <div className="topbar" style={{ paddingBottom: 0 }}>
         <button
-          onClick={() => { if (confirm('Скасувати тренування?')) navigate('/') }}
-          className="text-zinc-500 text-sm"
+          type="button"
+          onClick={() => {
+            if (confirm('Скасувати тренування?')) navigate('/')
+          }}
+          className="icon-btn"
+          aria-label="Назад"
         >
-          Скасувати
+          ←
         </button>
-        <span className="text-zinc-300 font-mono text-lg">{fmtTime(elapsed)}</span>
-        <button onClick={() => setFinishing(true)} className="text-zinc-100 text-sm font-medium">
-          Завершити
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div className="label" style={{ textAlign: 'center' }}>
+            {formatProgramTitle(program?.name ?? 'Тренування')}
+          </div>
+          <div className="num" style={{ fontSize: 18, fontWeight: 700 }}>{fmtTime(elapsed)}</div>
+        </div>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="Завершити або параметри"
+          onClick={requestFinish}
+        >
+          ⋯
         </button>
       </div>
 
-      {/* Кардіо-розминка */}
-      <div className="px-4 pb-3">
-        <div className="bg-zinc-900 rounded-2xl px-4 py-3 flex items-center gap-3">
-          <span className="text-xl shrink-0">🏃</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-zinc-300 mb-1.5">Кардіо розминка</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={cardio.type}
-                onChange={e => setCardio(c => ({ ...c, type: e.target.value }))}
-                className="bg-zinc-800 text-zinc-300 text-xs rounded-lg px-2 py-1 border border-zinc-700 outline-none"
-              >
-                {['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер'].map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  value={cardio.duration}
-                  onChange={e => setCardio(c => ({ ...c, duration: Number(e.target.value) || 0 }))}
-                  className="w-12 bg-zinc-800 text-zinc-300 text-xs rounded-lg px-2 py-1 text-center border border-zinc-700 outline-none"
-                />
-                <span className="text-zinc-500 text-xs">хв</span>
+      <div className="page stack" style={{ paddingTop: 12, gap: 14 }}>
+        <section className="stack" style={{ gap: 10 }}>
+          <div className="progress-strip">
+            <div className="progress-strip-fill" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="top-meta-bar">
+            <span>{completedSets} з {totalSets} підходів</span>
+            <span className="num">{progress}%</span>
+          </div>
+        </section>
+
+        <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+            <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}>🏃</div>
+            <div style={{ flex: 1 }}>
+              <div className="h-3" style={{ fontSize: 15 }}>Кардіо розминка</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <select
+                  value={cardio.type}
+                  onChange={event => setCardio(value => ({ ...value, type: event.target.value }))}
+                  className="select-field"
+                >
+                  {['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер'].map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="number"
+                    value={cardio.duration}
+                    onChange={event => setCardio(value => ({ ...value, duration: Number(event.target.value) || 0 }))}
+                    className="field"
+                    style={{ width: 62, textAlign: 'center' }}
+                  />
+                  <span className="meta">хв</span>
+                </div>
               </div>
             </div>
           </div>
           <button
-            onClick={() => setCardio(c => ({ ...c, done: !c.done }))}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0 transition-colors ${
-              cardio.done ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
-            }`}
+            type="button"
+            onClick={() => setCardio(value => ({ ...value, done: !value.done }))}
+            className="icon-btn"
+            style={{
+              background: cardio.done ? 'var(--accent)' : 'var(--surface-2)',
+              color: cardio.done ? 'var(--accent-text)' : 'var(--text-2)',
+              borderColor: cardio.done ? 'transparent' : 'var(--border)',
+            }}
+            aria-label="Завершити розминку"
           >
             {cardio.done ? '✓' : ''}
           </button>
         </div>
-      </div>
 
-      {/* Табуляція вправ */}
-      <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto scrollbar-none">
-        {exercises.map((e, i) => {
-          const done = e.sets.every(s => s.completed)
-          const partial = e.sets.some(s => s.completed)
-          return (
-            <button
-              key={e.exercise.id}
-              onClick={() => setCurrentIdx(i)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-xs transition-colors ${
-                i === currentIdx
-                  ? 'bg-zinc-100 text-zinc-950 font-medium'
-                  : done
-                  ? 'bg-green-900/60 text-green-300'
-                  : partial
-                  ? 'bg-zinc-700 text-zinc-200'
-                  : 'bg-zinc-800 text-zinc-400'
-              }`}
-            >
-              {e.exercise.name}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Картка вправи */}
-      <div className="flex-1 px-4 space-y-4 pb-8">
-
-        {/* Фото */}
-        {displayEx.machine_photo_url ? (
-          <img src={displayEx.machine_photo_url} alt={displayEx.name} className="w-full h-44 object-cover rounded-2xl" />
-        ) : (
-          <div className="w-full h-32 bg-zinc-900 rounded-2xl flex items-center justify-center text-zinc-600 text-sm">
-            фото тренажера
-          </div>
-        )}
-
-        {/* Назва + ⋯ меню + Замінити */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <h2 className="text-xl font-semibold truncate">{displayEx.name}</h2>
-            {isReplaced && (
-              <span className="shrink-0 text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded-full">заміна</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {cur.alternatives.length > 0 && (
-              <button
-                onClick={() => {
-                  const alt = cur.alternatives[0]
-                  if (isReplaced) {
-                    setReplacedExercises(r => { const n = { ...r }; delete n[cur.exercise.id]; return n })
-                    setExercises(prev => prev.map((e, i) =>
-                      i !== currentIdx ? e : { ...e, sets: originalSets[e.exercise.id] ?? e.sets }
-                    ))
-                    setOriginalSets(o => { const n = { ...o }; delete n[cur.exercise.id]; return n })
-                  } else {
-                    setOriginalSets(o => ({ ...o, [cur.exercise.id]: cur.sets }))
-                    setReplacedExercises(r => ({ ...r, [cur.exercise.id]: alt }))
-                    setExercises(prev => prev.map((e, i) =>
-                      i !== currentIdx ? e : {
-                        ...e,
-                        sets: Array.from({ length: alt.altDefaultSets ?? 3 }, () => ({
-                          weight: alt.altDefaultWeight ?? 0,
-                          reps: alt.altDefaultReps ?? 12,
-                          completed: false,
-                        }))
-                      }
-                    ))
-                  }
-                }}
-                className="text-xs text-zinc-400 border border-zinc-700 px-2 py-1 rounded-lg"
-              >
-                {isReplaced ? 'Повернутись' : '⇄ Замінити'}
-              </button>
-            )}
-            <button
-              onClick={() => { setMenuOpen(true); setNoteOpen(false) }}
-              className="w-9 h-9 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-400 text-lg leading-none"
-            >
-              ···
-            </button>
-          </div>
-        </div>
-
-        {/* Техніка (відкривається з меню) */}
-        {noteOpen && (
-          <div className="bg-zinc-900 rounded-2xl px-4 py-3 space-y-1">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Техніка</p>
-            {displayEx.description ? (
-              <p className="text-sm text-zinc-300 leading-relaxed">{displayEx.description}</p>
-            ) : (
-              <p className="text-sm text-zinc-600 italic">Опис техніки ще не додано.</p>
-            )}
-            {displayEx.personal_note && (
-              <>
-                <p className="text-xs text-zinc-500 uppercase tracking-widest mt-3 mb-1">Мої налаштування</p>
-                <p className="text-sm text-zinc-400 leading-relaxed">{displayEx.personal_note}</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Підходи */}
-        <div className="space-y-3">
-
-          {/* Розминочний підхід 50% */}
-          {warmupWeight > 0 && (
-            <div className="bg-zinc-900/60 rounded-2xl px-4 py-3 flex items-center justify-between border border-dashed border-zinc-700">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-md">W</span>
-                <span className="text-sm text-zinc-500">Розминка</span>
+        {rest !== null && (
+          <div className="timer-bar" style={{ '--p': `${Math.max(0, 100 - (rest / REST_SECONDS) * 100)}%` }}>
+            <div>
+              <div className="label" style={{ color: 'rgba(198,255,61,0.85)' }}>Відпочинок</div>
+              <div className="num" style={{ fontSize: 24, fontWeight: 600, color: 'var(--accent)' }}>
+                {fmtTime(rest)}
               </div>
-              <span className="text-sm text-zinc-500 font-mono">{warmupWeight} кг × 10</span>
             </div>
-          )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="button" className="btn btn-dark btn-sm" onClick={() => setRest(value => (value ?? 0) + 15)}>
+                +15с
+              </button>
+              <button type="button" className="btn btn-dark btn-sm" onClick={() => setRest(null)}>
+                Пропустити
+              </button>
+            </div>
+          </div>
+        )}
 
-          {cur.sets.map((set, si) => {
-            const prev = prevSets[cur.exercise.id]?.[si]
+        <div className="stack" style={{ gap: 12 }}>
+          {exercises.map((exercise, exerciseIndex) => {
+            const displayExercise = replacedExercises[exercise.exercise.id] ?? exercise.exercise
+            const isReplaced = !!replacedExercises[exercise.exercise.id]
+            const warmupWeight = exercise.defaultWeight > 0 ? Math.round(exercise.defaultWeight * 0.5) : 0
+            const exerciseDone = exercise.sets.every(set => set.completed)
+
             return (
-              <div
-                key={si}
-                className={`bg-zinc-900 rounded-2xl px-4 py-3 space-y-3 transition-opacity ${
-                  set.completed ? 'opacity-40' : ''
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-500">Підхід {si + 1}</span>
-                  {prev && (
-                    <span className="text-xs text-zinc-600">
-                      минулого: {prev.weight} кг × {prev.reps}
-                    </span>
+              <div key={exercise.exercise.id} className="ex-card" data-done={exerciseDone ? '1' : '0'}>
+                <div className="ex-head">
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
+                    <div className="ex-machine-photo">
+                      {displayExercise.machine_photo_url ? (
+                        <img src={displayExercise.machine_photo_url} alt={displayExercise.name} />
+                      ) : (
+                        <span style={{ fontSize: 18 }}>🏋️</span>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <div className="ex-name">{displayExercise.name}</div>
+                        {isReplaced && <span className="inline-badge">заміна</span>}
+                      </div>
+                      <div className="ex-note">{displayExercise.muscle_group ?? 'Тренажер'}</div>
+                      {displayExercise.personal_note && (
+                        <div className="ex-note" style={{ color: 'var(--text-4)' }}>
+                          💡 {displayExercise.personal_note}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    style={{ width: 32, height: 32, borderRadius: 10 }}
+                    onClick={() => {
+                      setMenuExerciseId(exercise.exercise.id)
+                      setMenuSection(null)
+                    }}
+                  >
+                    ⋯
+                  </button>
+                </div>
+
+                <div className="ex-table">
+                  <div className="ex-row ex-row-head">
+                    <div>#</div>
+                    <div>Минулого</div>
+                    <div>Вага</div>
+                    <div>Повт.</div>
+                    <div />
+                  </div>
+
+                  {exercise.sets.map((set, setIndex) => {
+                    const prev = prevSets[exercise.exercise.id]?.[setIndex]
+
+                    return (
+                      <div key={setIndex} className="ex-row" data-done={set.completed ? '1' : '0'}>
+                        <div className="set-num">{setIndex + 1}</div>
+                        <div className="set-last">{prev ? `${prev.weight}×${prev.reps}` : (warmupWeight > 0 ? `${exercise.defaultWeight ?? 0}×${exercise.defaultReps ?? 12}` : '—')}</div>
+                        <div className="set-value num">
+                          {editingCell?.exerciseId === exercise.exercise.id && editingCell?.setIdx === setIndex && editingCell?.field === 'weight' ? (
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoFocus
+                              defaultValue={String(set.weight)}
+                              className="set-inline-input"
+                              onBlur={event => {
+                                updateSet(
+                                  exerciseIndex,
+                                  setIndex,
+                                  'weight',
+                                  parseCellValue('weight', event.target.value, set.weight),
+                                )
+                                stopEditing()
+                              }}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter') {
+                                  updateSet(
+                                    exerciseIndex,
+                                    setIndex,
+                                    'weight',
+                                    parseCellValue('weight', event.currentTarget.value, set.weight),
+                                  )
+                                  stopEditing()
+                                }
+                                if (event.key === 'Escape') {
+                                  stopEditing()
+                                }
+                              }}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className="set-edit-btn num"
+                              onClick={() => startEditing(exercise.exercise.id, setIndex, 'weight')}
+                            >
+                              {set.weight}
+                            </button>
+                          )}
+                        </div>
+                        <div className="set-value num">
+                          {editingCell?.exerciseId === exercise.exercise.id && editingCell?.setIdx === setIndex && editingCell?.field === 'reps' ? (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoFocus
+                              defaultValue={String(set.reps)}
+                              className="set-inline-input"
+                              onBlur={event => {
+                                updateSet(
+                                  exerciseIndex,
+                                  setIndex,
+                                  'reps',
+                                  parseCellValue('reps', event.target.value, set.reps),
+                                )
+                                stopEditing()
+                              }}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter') {
+                                  updateSet(
+                                    exerciseIndex,
+                                    setIndex,
+                                    'reps',
+                                    parseCellValue('reps', event.currentTarget.value, set.reps),
+                                  )
+                                  stopEditing()
+                                }
+                                if (event.key === 'Escape') {
+                                  stopEditing()
+                                }
+                              }}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className="set-edit-btn num"
+                              onClick={() => startEditing(exercise.exercise.id, setIndex, 'reps')}
+                            >
+                              {set.reps}
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="set-check"
+                          data-done={set.completed ? '1' : '0'}
+                          onClick={() => completeSet(exerciseIndex, setIndex)}
+                        >
+                          {set.completed ? '✓' : ''}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="ex-footer">
+                  <button
+                    type="button"
+                    className="ex-action-btn"
+                    onClick={() => {
+                      setMenuExerciseId(exercise.exercise.id)
+                      setMenuSection('description')
+                    }}
+                  >
+                    🗒️ Нотатки
+                  </button>
+                  {exercise.alternatives.length > 0 && (
+                    <button
+                      type="button"
+                      className="ex-action-btn"
+                      onClick={() => {
+                        const alt = exercise.alternatives[0]
+                        if (isReplaced) {
+                          setReplacedExercises(prev => {
+                            const next = { ...prev }
+                            delete next[exercise.exercise.id]
+                            return next
+                          })
+                          setExercises(prev => prev.map((item, index) => (
+                            index !== exerciseIndex
+                              ? item
+                              : { ...item, sets: originalSets[item.exercise.id] ?? item.sets }
+                          )))
+                          setOriginalSets(prev => {
+                            const next = { ...prev }
+                            delete next[exercise.exercise.id]
+                            return next
+                          })
+                        } else {
+                          setOriginalSets(prev => ({ ...prev, [exercise.exercise.id]: exercise.sets }))
+                          setReplacedExercises(prev => ({ ...prev, [exercise.exercise.id]: alt }))
+                          setExercises(prev => prev.map((item, index) => (
+                            index !== exerciseIndex
+                              ? item
+                              : {
+                                  ...item,
+                                  sets: Array.from({ length: alt.altDefaultSets ?? 3 }, () => ({
+                                    weight: alt.altDefaultWeight ?? 0,
+                                    reps: alt.altDefaultReps ?? 12,
+                                    completed: false,
+                                  })),
+                                }
+                          )))
+                        }
+                      }}
+                    >
+                      ⇄ {isReplaced ? 'Повернути' : 'Замінити'}
+                    </button>
                   )}
                 </div>
-
-                {/* Вага */}
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => adjustWeight(currentIdx, si, -2.5)}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-300 text-xl flex items-center justify-center"
-                  >−</button>
-                  <div className="flex-1 text-center">
-                    <span className="text-2xl font-semibold">{set.weight}</span>
-                    <span className="text-zinc-500 text-sm ml-1">кг</span>
-                  </div>
-                  <button
-                    onClick={() => adjustWeight(currentIdx, si, 2.5)}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-300 text-xl flex items-center justify-center"
-                  >+</button>
-                </div>
-
-                {/* Повтори */}
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => adjustReps(currentIdx, si, -1)}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-300 text-xl flex items-center justify-center"
-                  >−</button>
-                  <div className="flex-1 text-center">
-                    <span className="text-2xl font-semibold">{set.reps}</span>
-                    <span className="text-zinc-500 text-sm ml-1">повт.</span>
-                  </div>
-                  <button
-                    onClick={() => adjustReps(currentIdx, si, 1)}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-300 text-xl flex items-center justify-center"
-                  >+</button>
-                </div>
-
-                {!set.completed && (
-                  <button
-                    onClick={() => completeSet(currentIdx, si)}
-                    className="w-full py-3 rounded-xl bg-zinc-100 text-zinc-950 font-semibold text-sm"
-                  >
-                    Підхід виконано ✓
-                  </button>
-                )}
               </div>
             )
           })}
         </div>
-
-        {/* Додати підхід */}
-        <button
-          onClick={() => addSet(currentIdx)}
-          className="w-full py-3 rounded-xl border border-zinc-800 text-zinc-500 text-sm"
-        >
-          + Додати підхід
-        </button>
-
-        {/* RPE — з'являється коли всі підходи вправи виконані */}
-        {curAllDone && (
-          <div className="bg-zinc-900 rounded-2xl px-4 py-3">
-            <p className="text-sm text-zinc-500 mb-2">Як було?</p>
-            <div className="flex gap-2">
-              {[['🟢', 'Легко'], ['🟡', 'Нормально'], ['🔴', 'Важко']].map(([icon, label]) => (
-                <button
-                  key={icon}
-                  onClick={() => setRpe(r => ({ ...r, [cur.exercise.id]: r[cur.exercise.id] === icon ? null : icon }))}
-                  className={`flex-1 flex flex-col items-center gap-1 py-3 rounded-xl text-2xl transition-colors ${
-                    rpe[cur.exercise.id] === icon
-                      ? 'bg-zinc-700 border border-zinc-500'
-                      : 'bg-zinc-800 border border-transparent'
-                  }`}
-                >
-                  {icon}
-                  <span className="text-xs text-zinc-400">{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ⋯ Меню вправи */}
-      {menuOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-end z-50" onClick={() => setMenuOpen(false)}>
-          <div
-            className="bg-zinc-900 w-full rounded-t-3xl p-6 space-y-2"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
-            <p className="text-sm font-medium text-zinc-400 mb-3">{displayEx.name}</p>
-
-            {/* Фото */}
-            <button
-              onClick={() => { setMenuOpen(false) }}
-              className="w-full flex items-center gap-4 py-3 px-4 bg-zinc-800 rounded-2xl text-left"
-            >
-              <span className="text-2xl">📷</span>
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Фото тренажера</p>
-                <p className="text-xs text-zinc-500">
-                  {displayEx.machine_photo_url ? 'Фото показано вгорі' : 'Фото ще не додано'}
-                </p>
-              </div>
-            </button>
-
-            {/* Відео */}
-            <button
-              onClick={() => {
-                setMenuOpen(false)
-                if (displayEx.youtube_url) window.open(displayEx.youtube_url, '_blank')
-              }}
-              className="w-full flex items-center gap-4 py-3 px-4 bg-zinc-800 rounded-2xl text-left"
-            >
-              <span className="text-2xl">▶️</span>
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Відео техніки</p>
-                <p className="text-xs text-zinc-500">
-                  {displayEx.youtube_url ? 'Відкрити YouTube' : 'Відео ще не додано'}
-                </p>
-              </div>
-            </button>
-
-            {/* Техніка */}
-            <button
-              onClick={() => { setNoteOpen(v => !v); setMenuOpen(false) }}
-              className="w-full flex items-center gap-4 py-3 px-4 bg-zinc-800 rounded-2xl text-left"
-            >
-              <span className="text-2xl">📝</span>
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Техніка виконання</p>
-                <p className="text-xs text-zinc-500">
-                  {displayEx.description
-                    ? displayEx.description.slice(0, 50) + (displayEx.description.length > 50 ? '…' : '')
-                    : 'Ще не додано'}
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="w-full py-3 text-zinc-500 text-sm mt-2"
-            >
-              Закрити
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Таймер відпочинку */}
-      {rest !== null && (
-        <div
-          className="fixed inset-0 bg-zinc-950/95 flex flex-col items-center justify-center gap-6 z-40"
-          onClick={() => setRest(null)}
+      <div className="finish-bar">
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          onClick={requestFinish}
+          style={{ opacity: 1 }}
         >
-          <p className="text-zinc-400 text-lg">Відпочинок</p>
-          <span className="text-8xl font-mono font-bold text-zinc-100">{rest}</span>
-          <div className="flex gap-3">
-            <button
-              onClick={e => { e.stopPropagation(); setRest(r => (r ?? 0) + 15) }}
-              className="px-4 py-2 bg-zinc-800 rounded-xl text-zinc-300 text-sm"
-            >
-              +15с
-            </button>
-            <button
-              onClick={() => setRest(null)}
-              className="px-4 py-2 bg-zinc-800 rounded-xl text-zinc-300 text-sm"
-            >
-              Пропустити
-            </button>
+          Завершити тренування
+        </button>
+      </div>
+
+      {menuExercise && (
+        <div className="sheet-backdrop" onClick={() => { setMenuExerciseId(null); setMenuSection(null) }}>
+          <div className="sheet" onClick={event => event.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="stack" style={{ gap: 10 }}>
+              <div>
+                <div className="h-3">{menuDisplayExercise?.name}</div>
+                <div className="meta" style={{ marginTop: 4 }}>Швидкі дії для вправи</div>
+              </div>
+
+              <button
+                type="button"
+                className="prog-select-card"
+                onClick={() => setMenuSection(menuSection === 'photo' ? null : 'photo')}
+              >
+                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}>📷</div>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Фото тренажера</div>
+                  <div className="meta">{menuDisplayExercise?.machine_photo_url ? 'Показати фото' : 'Фото ще не додано'}</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="prog-select-card"
+                onClick={() => {
+                  if (menuDisplayExercise?.youtube_url) {
+                    window.open(menuDisplayExercise.youtube_url, '_blank')
+                  }
+                }}
+              >
+                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}>▶️</div>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Відео техніки</div>
+                  <div className="meta">{menuDisplayExercise?.youtube_url ? 'Відкрити YouTube' : 'Відео ще не додано'}</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="prog-select-card"
+                onClick={() => setMenuSection(menuSection === 'description' ? null : 'description')}
+              >
+                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}>📝</div>
+                <div>
+                  <div style={{ fontWeight: 600 }}>Техніка виконання</div>
+                  <div className="meta">
+                    {menuDisplayExercise?.description
+                      ? `${menuDisplayExercise.description.slice(0, 56)}${menuDisplayExercise.description.length > 56 ? '…' : ''}`
+                      : 'Ще не додано'}
+                  </div>
+                </div>
+              </button>
+
+              {menuSection === 'photo' && (
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div className="exercise-hero" style={{ minHeight: 180, border: 0, borderRadius: 0 }}>
+                    {menuDisplayExercise?.machine_photo_url ? (
+                      <img src={menuDisplayExercise.machine_photo_url} alt={menuDisplayExercise.name} />
+                    ) : (
+                      <span>Фото тренажера</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {menuSection === 'description' && (
+                <div className="card">
+                  <div className="label" style={{ marginBottom: 8 }}>Техніка</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text-2)' }}>
+                    {menuDisplayExercise?.description ?? 'Опис техніки ще не додано.'}
+                  </div>
+                  {menuDisplayExercise?.personal_note && (
+                    <div style={{ marginTop: 12 }}>
+                      <div className="label" style={{ marginBottom: 8 }}>Мої нотатки</div>
+                      <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text-2)' }}>
+                        {menuDisplayExercise.personal_note}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Завершити */}
-      {finishing && (
-        <div className="fixed inset-0 bg-black/70 flex items-end z-50">
-          <div className="bg-zinc-900 w-full rounded-t-3xl p-6 space-y-6">
-            <div>
-              <p className="text-lg font-semibold">Як тренування?</p>
-              <p className="text-zinc-500 text-sm">
-                {fmtTime(elapsed)} · {exercises.reduce((acc, e) => acc + e.sets.filter(s => s.completed).length, 0)} підходів
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { key: 'важко', label: 'Важко', icon: '😤' },
-                { key: 'нормально', label: 'Нормально', icon: '💪' },
-                { key: 'легко', label: 'Легко', icon: '🌿' },
-              ].map(({ key, label, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => finishWorkout(key)}
-                  className="flex flex-col items-center gap-2 bg-zinc-800 rounded-2xl py-5 text-2xl active:scale-95 transition-transform"
-                >
-                  <span>{icon}</span>
-                  <span className="text-xs text-zinc-400">{label}</span>
+      {confirmFinish && (
+        <div className="modal-backdrop" onClick={() => setConfirmFinish(false)}>
+          <div className="modal-card" onClick={event => event.stopPropagation()} style={{ maxWidth: 380, padding: 22 }}>
+            <div className="stack" style={{ gap: 18 }}>
+              <div className="sheet-header">
+                <p className="sheet-title">Не всі підходи завершені</p>
+                <p className="sheet-subtitle">Точно завершити тренування зараз?</p>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 16,
+                  background: 'rgba(255,181,71,0.08)',
+                  border: '1px solid rgba(255,181,71,0.22)',
+                  color: 'var(--warning)',
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                }}
+              >
+                У тебе виконано {completedSets} з {totalSets} підходів. Можеш повернутись і догнати, або завершити вже зараз.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button type="button" className="btn btn-ghost btn-block" onClick={() => setConfirmFinish(false)}>
+                  Продовжити
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className="btn btn-primary btn-block"
+                  onClick={() => {
+                    setConfirmFinish(false)
+                    setSummaryOpen(true)
+                  }}
+                >
+                  Завершити
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setFinishing(false)}
-              className="w-full py-3 text-zinc-500 text-sm"
-            >
-              Продовжити тренування
-            </button>
           </div>
         </div>
       )}
+
     </div>
   )
 }

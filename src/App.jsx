@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import BottomNav from './components/BottomNav'
 import Login from './pages/Login'
@@ -9,6 +9,32 @@ import Programs from './pages/Programs'
 import ProgramDetail from './pages/ProgramDetail'
 import ActiveWorkout from './pages/ActiveWorkout'
 import BodyStats from './pages/BodyStats'
+
+function AppRoutes() {
+  const location = useLocation()
+  const hideNav =
+    location.pathname.startsWith('/workout/') ||
+    location.pathname.startsWith('/programs/') ||
+    location.pathname === '/progress/body'
+
+  return (
+    <div className="stage">
+      <div className="app-shell">
+        <div className="route-frame">
+          <Routes>
+            <Route path="/" element={<Workout />} />
+            <Route path="/progress" element={<Progress />} />
+            <Route path="/programs" element={<Programs />} />
+            <Route path="/programs/:id" element={<ProgramDetail />} />
+            <Route path="/workout/:programId" element={<ActiveWorkout />} />
+            <Route path="/progress/body" element={<BodyStats />} />
+          </Routes>
+        </div>
+        {!hideNav && <BottomNav />}
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -20,22 +46,11 @@ export default function App() {
   }, [])
 
   if (session === undefined) return null
-
   if (!session) return <Login />
 
   return (
     <BrowserRouter>
-      <div className="pb-20" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
-        <Routes>
-          <Route path="/" element={<Workout />} />
-          <Route path="/progress" element={<Progress />} />
-          <Route path="/programs" element={<Programs />} />
-          <Route path="/programs/:id" element={<ProgramDetail />} />
-          <Route path="/workout/:programId" element={<ActiveWorkout />} />
-          <Route path="/progress/body" element={<BodyStats />} />
-        </Routes>
-      </div>
-      <BottomNav />
+      <AppRoutes />
     </BrowserRouter>
   )
 }

@@ -2,85 +2,110 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+function splitPrograms(programs) {
+  return {
+    main: programs.filter(program => program.type === 'основна'),
+    light: programs.filter(program => program.type === 'додаткова' && program.name?.toLowerCase().startsWith('легке')),
+    mix: programs.filter(program => program.type === 'додаткова' && program.name?.toLowerCase().startsWith('мікс')),
+  }
+}
+
 export default function Programs() {
   const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: u }) =>
-      console.log('current user id:', u?.user?.id)
-    )
     supabase
       .from('mf_programs')
       .select('*')
       .order('type')
-      .then(({ data, error }) => {
-        console.log('programs data:', data, 'error:', error)
+      .then(({ data }) => {
         setPrograms(data ?? [])
         setLoading(false)
       })
   }, [])
 
-  const main = programs.filter(p => p.type === 'основна')
-  const extra = programs.filter(p => p.type === 'додаткова')
+  const { main, light, mix } = splitPrograms(programs)
 
-  if (loading) return <div className="p-6 text-zinc-500">Завантаження...</div>
+  if (loading) {
+    return (
+      <div className="screen">
+        <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Програми</h1>
-        <button className="w-9 h-9 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-400 text-lg">
-          👤
-        </button>
+    <div className="screen">
+      <div className="topbar">
+        <div className="topbar-title">
+          <div className="label">{programs.length} програм</div>
+          <div className="h-1">Програми</div>
+        </div>
+        <div className="topbar-actions">
+          <button type="button" className="icon-btn" aria-label="Профіль">👤</button>
+        </div>
       </div>
 
-      {programs.length === 0 && (
-        <p className="text-zinc-500 text-sm">Програм ще немає</p>
-      )}
-
-      {main.length > 0 && (
-        <section className="space-y-2">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">Основні</p>
-          <div className="space-y-2">
-            {main.map(p => (
-              <ProgramCard key={p.id} program={p} onClick={() => navigate(`/programs/${p.id}`)} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {extra.length > 0 && (
-        <section className="space-y-2">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">Додаткові</p>
-          <div className="space-y-2">
-            {extra.map(p => (
-              <ProgramCard key={p.id} program={p} onClick={() => navigate(`/programs/${p.id}`)} />
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="page stack" style={{ paddingTop: 6, gap: 20 }}>
+        {main.length > 0 && (
+          <ProgramSection title="Основні — 4 дні на тиждень" programs={main} onOpen={navigate} />
+        )}
+        {light.length > 0 && (
+          <ProgramSection title="Легкі" programs={light} onOpen={navigate} />
+        )}
+        {mix.length > 0 && (
+          <ProgramSection title="Міксові" programs={mix} onOpen={navigate} />
+        )}
+      </div>
     </div>
   )
 }
 
-function ProgramCard({ program, onClick }) {
+function ProgramSection({ title, programs, onOpen }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-4 bg-zinc-900 rounded-2xl px-4 py-4 text-left active:scale-[0.98] transition-transform"
-    >
-      <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
-        style={{ backgroundColor: program.color ?? '#27272a' }}
-      >
-        {program.emoji ?? '💪'}
+    <section className="stack" style={{ gap: 10 }}>
+      <div className="section-head" style={{ marginBottom: 0 }}>
+        <div className="label">{title}</div>
       </div>
-      <div>
-        <p className="font-medium text-zinc-100">{program.name}</p>
-      </div>
-      <span className="ml-auto text-zinc-600 text-lg">›</span>
-    </button>
+      {programs.map(program => (
+        <button
+          key={program.id}
+          type="button"
+          className="program-card"
+          onClick={() => onOpen(`/programs/${program.id}`)}
+          style={{
+            background:
+              program.type === 'основна'
+                ? `radial-gradient(80% 70% at 100% 0%, ${program.color ?? '#3f3f46'}14, transparent), var(--surface)`
+                : 'var(--surface)',
+            borderColor: program.type === 'основна' ? `${program.color ?? '#3f3f46'}40` : 'var(--border)',
+            textAlign: 'left',
+          }}
+        >
+          <div className="card-row">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 20 }}>{program.emoji ?? '💪'}</span>
+                <div className="h-2">{trimProgramName(program.name)}</div>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: program.color ?? '#71717a', flexShrink: 0 }} />
+              </div>
+              <div className="meta" style={{ marginTop: 4 }}>{extractProgramDescription(program.name)}</div>
+            </div>
+            <span className="icon-btn" style={{ width: 32, height: 32, borderRadius: 10 }}>›</span>
+          </div>
+        </button>
+      ))}
+    </section>
   )
+}
+
+function trimProgramName(name = '') {
+  return name.replace(/\s+—.+$/, '')
+}
+
+function extractProgramDescription(name = '') {
+  const match = name.match(/—\s*(.+)$/)
+  return match?.[1] ?? 'Персональна добірка вправ'
 }

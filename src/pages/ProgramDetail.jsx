@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function ProgramDetail() {
@@ -21,128 +21,149 @@ export default function ProgramDetail() {
           .eq('program_id', id)
           .order('order'),
       ])
+
       setProgram(prog)
       setExercises(exs ?? [])
       setLoading(false)
     }
+
     load()
   }, [id])
 
   async function saveNote(exerciseId) {
     await supabase.from('mf_exercises').update({ personal_note: noteText }).eq('id', exerciseId)
-    setExercises(prev =>
-      prev.map(e =>
-        e.exercise.id === exerciseId
-          ? { ...e, exercise: { ...e.exercise, personal_note: noteText } }
-          : e
-      )
-    )
+    setExercises(prev => prev.map(item => (
+      item.exercise.id === exerciseId
+        ? { ...item, exercise: { ...item.exercise, personal_note: noteText } }
+        : item
+    )))
     setNoteOpen(null)
   }
 
-  if (loading) return <div className="p-6 text-zinc-500">Завантаження...</div>
-  if (!program) return <div className="p-6 text-zinc-500">Програму не знайдено</div>
+  if (loading) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (!program) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top meta">Програму не знайдено</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/programs')} className="text-zinc-400 text-2xl leading-none">‹</button>
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-          style={{ backgroundColor: program.color ?? '#27272a' }}
-        >
-          {program.emoji ?? '💪'}
+    <div className="screen screen--no-nav">
+      <div className="topbar">
+        <button type="button" className="icon-btn" onClick={() => navigate('/programs')}>←</button>
+        <div className="topbar-title" style={{ alignItems: 'center', textAlign: 'center', flex: 1 }}>
+          <div className="label">Програма</div>
+          <div className="h-3">{program.name}</div>
         </div>
-        <h1 className="text-xl font-semibold">{program.name}</h1>
+        <div style={{ width: 38 }} />
       </div>
 
-      {exercises.length === 0 && (
-        <p className="text-zinc-500 text-sm">Вправ ще немає</p>
-      )}
-
-      <div className="space-y-3">
-        {exercises.map(({ exercise, default_sets, default_reps, default_weight }) => (
-          <div key={exercise.id} className="bg-zinc-900 rounded-2xl overflow-hidden">
-            {exercise.machine_photo_url ? (
-              <img
-                src={exercise.machine_photo_url}
-                alt={exercise.name}
-                className="w-full h-40 object-cover"
-              />
-            ) : (
-              <div className="w-full h-32 bg-zinc-800 flex items-center justify-center text-zinc-600 text-sm">
-                фото тренажера
+      <div className="page stack" style={{ paddingTop: 8, gap: 14 }}>
+        <div className="card" style={{ padding: 18 }}>
+          <div className="card-row" style={{ alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                className="prog-icon"
+                style={{ background: `${program.color ?? '#3f3f46'}18` }}
+              >
+                <span>{program.emoji ?? '💪'}</span>
               </div>
-            )}
+              <div>
+                <div className="h-3">{program.name.replace(/\s+—.+$/, '')}</div>
+                <div className="meta" style={{ marginTop: 2 }}>
+                  {program.name.match(/—\s*(.+)$/)?.[1] ?? 'Добірка вправ'}
+                </div>
+              </div>
+            </div>
+            <span className="chip-dot" style={{ width: 10, height: 10, background: program.color ?? '#71717a' }} />
+          </div>
+        </div>
 
-            <div className="px-4 py-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-zinc-100">{exercise.name}</p>
-                <div className="flex items-center gap-3">
+        {exercises.length === 0 && (
+          <div className="card">
+            <div className="meta">У цій програмі ще немає вправ.</div>
+          </div>
+        )}
+
+        {exercises.map(({ exercise, default_sets, default_reps, default_weight }) => (
+          <article key={exercise.id} className="program-card" style={{ overflow: 'hidden', padding: 0 }}>
+            <div className="exercise-hero" style={{ aspectRatio: '16 / 8', border: 0, borderBottom: '1px solid var(--border)', borderRadius: 0 }}>
+              {exercise.machine_photo_url ? (
+                <img src={exercise.machine_photo_url} alt={exercise.name} />
+              ) : (
+                <span>Фото тренажера</span>
+              )}
+            </div>
+
+            <div className="stack" style={{ gap: 12, padding: 18 }}>
+              <div className="card-row" style={{ alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div className="h-3">{exercise.name}</div>
+                  <div className="meta" style={{ marginTop: 4 }}>
+                    {default_sets} підходи · {default_reps} повторень · {default_weight} кг
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
                   {exercise.youtube_url && (
-                    <a
-                      href={exercise.youtube_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-zinc-400 text-lg"
-                    >
+                    <a href={exercise.youtube_url} target="_blank" rel="noreferrer" className="icon-btn">
                       ▶️
                     </a>
                   )}
                   <button
+                    type="button"
+                    className="icon-btn"
                     onClick={() => {
                       setNoteOpen(exercise.id)
                       setNoteText(exercise.personal_note ?? '')
                     }}
-                    className="text-zinc-400 text-lg"
                   >
                     📝
                   </button>
                 </div>
               </div>
 
-              <p className="text-sm text-zinc-500">
-                {default_sets} підходи · {default_reps} повторень · {default_weight} кг
-              </p>
-
               {exercise.personal_note && (
-                <p className="text-sm text-zinc-400 bg-zinc-800 rounded-xl px-3 py-2">
-                  {exercise.personal_note}
-                </p>
+                <div className="card" style={{ background: 'var(--surface-2)', padding: 14 }}>
+                  <div className="label" style={{ marginBottom: 6 }}>Мої налаштування</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-2)' }}>{exercise.personal_note}</div>
+                </div>
               )}
             </div>
-          </div>
+          </article>
         ))}
       </div>
 
       {noteOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={() => setNoteOpen(null)}>
-          <div
-            className="bg-zinc-900 w-full rounded-t-3xl p-6 space-y-4"
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="font-medium">Нотатка про тренажер</p>
-            <textarea
-              value={noteText}
-              onChange={e => setNoteText(e.target.value)}
-              placeholder="Висота сидіння, позиція валиків..."
-              rows={4}
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-sm outline-none resize-none placeholder:text-zinc-600"
-              autoFocus
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setNoteOpen(null)}
-                className="flex-1 py-3 rounded-xl bg-zinc-800 text-zinc-400 text-sm"
-              >
-                Скасувати
-              </button>
-              <button
-                onClick={() => saveNote(noteOpen)}
-                className="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-950 text-sm font-medium"
-              >
-                Зберегти
-              </button>
+        <div className="sheet-backdrop" onClick={() => setNoteOpen(null)}>
+          <div className="sheet" onClick={event => event.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="stack">
+              <div className="h-3">Нотатка про тренажер</div>
+              <textarea
+                value={noteText}
+                onChange={event => setNoteText(event.target.value)}
+                placeholder="Висота сидіння, позиція валиків..."
+                rows={4}
+                className="textarea-field"
+                autoFocus
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button type="button" className="btn btn-ghost btn-block" onClick={() => setNoteOpen(null)}>
+                  Скасувати
+                </button>
+                <button type="button" className="btn btn-primary btn-block" onClick={() => saveNote(noteOpen)}>
+                  Зберегти
+                </button>
+              </div>
             </div>
           </div>
         </div>

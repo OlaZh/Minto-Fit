@@ -13,7 +13,7 @@ const FIELDS = [
   { key: 'right_calf', label: 'Литка права', unit: 'см', step: 0.5 },
   { key: 'left_arm', label: 'Рука ліва', unit: 'см', step: 0.5 },
   { key: 'right_arm', label: 'Рука права', unit: 'см', step: 0.5 },
-  { key: 'wrist', label: 'Зап\'ясток', unit: 'см', step: 0.1 },
+  { key: 'wrist', label: 'Запʼясток', unit: 'см', step: 0.1 },
 ]
 
 const CHART_FIELDS = [
@@ -44,8 +44,10 @@ export default function BodyStats() {
         setHistory(rows)
         if (rows[0]) {
           const last = { ...rows[0] }
-          delete last.id; delete last.user_id; delete last.recorded_at
-          setForm(Object.fromEntries(Object.entries(last).map(([k, v]) => [k, v ?? ''])))
+          delete last.id
+          delete last.user_id
+          delete last.recorded_at
+          setForm(Object.fromEntries(Object.entries(last).map(([key, value]) => [key, value ?? ''])))
         }
       })
   }, [])
@@ -54,125 +56,137 @@ export default function BodyStats() {
     setSaving(true)
     const { data: user } = await supabase.auth.getUser()
     const payload = { user_id: user.user.id }
-    FIELDS.forEach(f => {
-      const v = parseFloat(form[f.key])
-      if (!isNaN(v)) payload[f.key] = v
+
+    FIELDS.forEach(field => {
+      const value = parseFloat(form[field.key])
+      if (!Number.isNaN(value)) payload[field.key] = value
     })
+
     await supabase.from('mf_body_stats').insert(payload)
+
     const { data } = await supabase
       .from('mf_body_stats')
       .select('*')
       .order('recorded_at', { ascending: false })
       .limit(20)
+
     setHistory(data ?? [])
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
-  // ── Chart ──────────────────────────────────────────────────
   const chartData = history
-    .filter(r => r[activeChart] != null)
+    .filter(item => item[activeChart] != null)
     .slice(0, 12)
     .reverse()
-    .map(r => ({
-      value: parseFloat(r[activeChart]),
-      date: new Date(r.recorded_at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
+    .map(item => ({
+      value: parseFloat(item[activeChart]),
+      date: new Date(item.recorded_at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
     }))
 
-  const values = chartData.map(d => d.value)
+  const values = chartData.map(item => item.value)
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = max - min || 1
-  const W = 300
-  const H = 100
+  const width = 300
+  const height = 100
   const pad = 12
 
-  const points = chartData.map((d, i) => {
-    const x = pad + (i / Math.max(chartData.length - 1, 1)) * (W - pad * 2)
-    const y = H - pad - ((d.value - min) / range) * (H - pad * 2)
-    return { x, y, ...d }
+  const points = chartData.map((item, index) => {
+    const x = pad + (index / Math.max(chartData.length - 1, 1)) * (width - pad * 2)
+    const y = height - pad - ((item.value - min) / range) * (height - pad * 2)
+    return { x, y, ...item }
   })
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+  const pathD = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
 
   return (
-    <div className="p-4 space-y-6 pb-8">
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/progress')} className="text-zinc-400 text-2xl leading-none">‹</button>
-        <h1 className="text-xl font-semibold">Зміни</h1>
+    <div className="screen screen--no-nav">
+      <div className="topbar">
+        <button type="button" className="icon-btn" onClick={() => navigate('/progress')}>←</button>
+        <div className="topbar-title" style={{ alignItems: 'center', textAlign: 'center', flex: 1 }}>
+          <div className="label">Заміри</div>
+          <div className="h-3">Зміни тіла</div>
+        </div>
+        <div style={{ width: 38 }} />
       </div>
 
-      {/* Chart */}
-      {chartData.length > 1 && (
-        <section className="space-y-3">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {CHART_FIELDS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => setActiveChart(f.key)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs transition-colors ${
-                  activeChart === f.key
-                    ? 'bg-zinc-100 text-zinc-950 font-medium'
-                    : 'bg-zinc-800 text-zinc-400'
-                }`}
+      <div className="page stack" style={{ paddingTop: 8, gap: 18 }}>
+        {chartData.length > 1 && (
+          <section className="card line-chart-card">
+            <div className="pill-row" style={{ marginBottom: 14 }}>
+              {CHART_FIELDS.map(field => (
+                <button
+                  key={field.key}
+                  type="button"
+                  className="pill-btn"
+                  data-active={activeChart === field.key ? '1' : '0'}
+                  onClick={() => setActiveChart(field.key)}
+                >
+                  {field.label}
+                </button>
+              ))}
+            </div>
+
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ height: 110 }}>
+              <path d={pathD} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              {points.map((point, index) => (
+                <circle key={index} cx={point.x} cy={point.y} r="3.5" fill="var(--text)" />
+              ))}
+            </svg>
+
+            <div className="card-row" style={{ marginTop: 8, alignItems: 'flex-end' }}>
+              <span className="meta">{points[0]?.date}</span>
+              <span className="num" style={{ fontSize: 18, fontWeight: 600 }}>
+                {points[points.length - 1]?.value} {FIELDS.find(field => field.key === activeChart)?.unit}
+              </span>
+              <span className="meta">{points[points.length - 1]?.date}</span>
+            </div>
+          </section>
+        )}
+
+        <section className="card">
+          <div className="h-3" style={{ marginBottom: 12 }}>Нова сесія</div>
+          <div className="stack" style={{ gap: 10 }}>
+            {FIELDS.map(field => (
+              <div
+                key={field.key}
+                className="card-row"
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 16,
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                }}
               >
-                {f.label}
-              </button>
+                <label style={{ color: 'var(--text)' }}>{field.label}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number"
+                    step={field.step}
+                    value={form[field.key] ?? ''}
+                    onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))}
+                    placeholder="—"
+                    className="field"
+                    style={{ width: 86, textAlign: 'right', background: 'transparent', border: 0, paddingRight: 0 }}
+                  />
+                  <span className="meta" style={{ width: 22 }}>{field.unit}</span>
+                </div>
+              </div>
             ))}
           </div>
 
-          <div className="bg-zinc-900 rounded-2xl p-4">
-            <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 100 }}>
-              <path d={pathD} fill="none" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              {points.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r="3" fill="#e4e4e7" />
-              ))}
-            </svg>
-            <div className="flex justify-between mt-1">
-              {points.length > 0 && (
-                <>
-                  <span className="text-xs text-zinc-600">{points[0].date}</span>
-                  <span className="text-xs text-zinc-400 font-medium">
-                    {points[points.length - 1].value} {FIELDS.find(f => f.key === activeChart)?.unit}
-                  </span>
-                  <span className="text-xs text-zinc-600">{points[points.length - 1].date}</span>
-                </>
-              )}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="btn btn-primary btn-block"
+            style={{ marginTop: 14, opacity: saving ? 0.7 : 1 }}
+          >
+            {saved ? 'Збережено ✓' : saving ? 'Зберігаємо...' : 'Зберегти заміри'}
+          </button>
         </section>
-      )}
-
-      {/* Form */}
-      <section className="space-y-2">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest">Нова сесія</p>
-        <div className="space-y-2">
-          {FIELDS.map(f => (
-            <div key={f.key} className="flex items-center justify-between bg-zinc-900 rounded-2xl px-4 py-3">
-              <label className="text-sm text-zinc-300">{f.label}</label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  step={f.step}
-                  value={form[f.key] ?? ''}
-                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  placeholder="—"
-                  className="w-20 bg-transparent text-right text-zinc-100 text-sm outline-none placeholder:text-zinc-600"
-                />
-                <span className="text-zinc-500 text-sm w-6">{f.unit}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full py-4 rounded-2xl bg-zinc-100 text-zinc-950 font-semibold mt-2 disabled:opacity-50"
-        >
-          {saved ? 'Збережено ✓' : saving ? 'Зберігаємо...' : 'Зберегти заміри'}
-        </button>
-      </section>
+      </div>
     </div>
   )
 }
