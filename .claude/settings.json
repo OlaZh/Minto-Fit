@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Read(//c/Users/violk/.claude/projects/c--Users-violk-Desktop-Minto-Fit/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\violk\\.claude\\projects\\c--Users-violk-Desktop-Minto-Fit\\memory"
+    ]
+  }
+}

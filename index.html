@@ -1,0 +1,3032 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>MintoFit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #08080a;
+        --bg-2: #0e0e11;
+        --surface: #131316;
+        --surface-2: #1b1b20;
+        --surface-3: #25252c;
+        --border: rgba(255, 255, 255, 0.06);
+        --border-strong: rgba(255, 255, 255, 0.1);
+        --border-bright: rgba(255, 255, 255, 0.16);
+        --text: #f5f5f5;
+        --text-2: #9a9aa3;
+        --text-3: #5a5a62;
+        --text-4: #3a3a40;
+        --accent: #c6ff3d;
+        --accent-2: #9fe800;
+        --accent-text: #0a0a0b;
+        --danger: #ff5a5f;
+        --warn: #ffb547;
+        --r-sm: 10px;
+        --r-md: 14px;
+        --r-lg: 20px;
+        --r-xl: 28px;
+        --r-full: 9999px;
+        --font: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --font-mono: "Geist Mono", ui-monospace, monospace;
+        /* Program colors */
+        --day-a: #4ade80;
+        --day-b: #60a5fa;
+        --day-c: #c084fc;
+        --day-d: #fbbf24;
+        --day-light: #6b7280;
+        --day-mix: #f472b6;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 16px;
+        line-height: 1.4;
+        -webkit-font-smoothing: antialiased;
+        overscroll-behavior: none;
+      }
+      button {
+        font-family: inherit;
+        color: inherit;
+      }
+      input {
+        font-family: inherit;
+        color: inherit;
+      }
+      ::selection {
+        background: var(--accent);
+        color: var(--accent-text);
+      }
+      button,
+      a,
+      [role="button"] {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .stage {
+        min-height: 100dvh;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        background:
+          radial-gradient(
+            1200px 600px at 50% -200px,
+            rgba(198, 255, 61, 0.04),
+            transparent 60%
+          ),
+          var(--bg);
+      }
+      .app {
+        width: 100%;
+        max-width: 440px;
+        min-height: 100dvh;
+        background: var(--bg);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      @media (min-width: 520px) {
+        .stage {
+          padding: 24px 16px;
+        }
+        .app {
+          min-height: min(900px, calc(100dvh - 48px));
+          max-height: calc(100dvh - 48px);
+          border-radius: 34px;
+          border: 1px solid var(--border-strong);
+          box-shadow:
+            0 0 0 1px rgba(0, 0, 0, 0.5),
+            0 40px 80px -20px rgba(0, 0, 0, 0.5);
+          overflow: hidden;
+        }
+      }
+      .screen {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 96px;
+      }
+      .screen::-webkit-scrollbar {
+        width: 0;
+      }
+
+      /* Typography */
+      .h-1 {
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+      }
+      .h-2 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+      }
+      .h-3 {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-3);
+      }
+      .meta {
+        font-size: 13px;
+        color: var(--text-2);
+      }
+      .num {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Topbar */
+      .topbar {
+        padding: max(env(safe-area-inset-top), 20px) 20px 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .topbar-title {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .topbar-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text-2);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+        flex-shrink: 0;
+      }
+      .icon-btn:hover {
+        background: var(--surface-2);
+        color: var(--text);
+      }
+      .icon-btn:active {
+        transform: scale(0.96);
+      }
+
+      /* Bottom Nav */
+      .nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 16px max(env(safe-area-inset-bottom), 16px);
+        background: linear-gradient(
+          to top,
+          var(--bg) 60%,
+          rgba(8, 8, 10, 0.7) 90%,
+          transparent
+        );
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+      .nav-inner {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        width: 100%;
+        max-width: 360px;
+        padding: 8px;
+        background: rgba(19, 19, 22, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--r-full);
+        box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+      }
+      .nav-btn {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: var(--text-3);
+        padding: 10px 14px;
+        border-radius: var(--r-full);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .nav-btn[data-active="1"] {
+        color: var(--accent-text);
+        background: var(--accent);
+      }
+      .nav-btn .nav-label {
+        display: none;
+      }
+      .nav-btn[data-active="1"] .nav-label {
+        display: inline;
+      }
+
+      /* Cards */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        padding: 18px;
+      }
+      .card-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      /* Buttons */
+      .btn {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 14px 20px;
+        border-radius: var(--r-full);
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+        transition:
+          transform 0.12s ease,
+          background 0.15s,
+          opacity 0.15s;
+      }
+      .btn:active {
+        transform: scale(0.97);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: var(--accent-text);
+        box-shadow: 0 8px 20px -8px rgba(198, 255, 61, 0.5);
+      }
+      .btn-primary:hover {
+        background: #d6ff52;
+      }
+      .btn-ghost {
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+      }
+      .btn-ghost:hover {
+        background: var(--surface-2);
+      }
+      .btn-dark {
+        background: var(--surface-3);
+        color: var(--text);
+      }
+      .btn-block {
+        width: 100%;
+      }
+      .btn-sm {
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+
+      /* Chips */
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: var(--r-full);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--text-2);
+        font-weight: 500;
+      }
+      .chip-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      /* Stats */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .stat {
+        padding: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-md);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .stat-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-3);
+      }
+      .stat-value {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .stat-sub {
+        font-size: 11px;
+        color: var(--text-2);
+      }
+      .stat-up {
+        color: var(--accent);
+      }
+
+      /* Program selection cards — home screen */
+      .prog-select-card {
+        border-radius: var(--r-lg);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          background 0.15s,
+          transform 0.12s;
+        width: 100%;
+        text-align: left;
+        appearance: none;
+      }
+      .prog-select-card:hover {
+        border-color: var(--border-bright);
+        background: var(--surface-2);
+      }
+      .prog-select-card:active {
+        transform: scale(0.98);
+      }
+      .prog-color-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .prog-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+      .prog-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 0;
+      }
+
+      /* Workout exercise cards */
+      .ex-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+      }
+      .ex-card[data-done="1"] {
+        opacity: 0.6;
+      }
+      .ex-head {
+        padding: 16px 18px 12px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .ex-machine-photo {
+        width: 52px;
+        height: 52px;
+        border-radius: 10px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        display: grid;
+        place-items: center;
+        color: var(--text-3);
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .ex-machine-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .ex-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      .ex-note {
+        font-size: 12px;
+        color: var(--text-3);
+        margin-top: 2px;
+      }
+      .ex-table {
+        padding: 0 18px 14px;
+      }
+      .ex-row {
+        display: grid;
+        grid-template-columns: 28px 64px 1fr 1fr 36px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        border-top: 1px solid var(--border);
+      }
+      .ex-row:first-child {
+        border-top: 0;
+      }
+      .ex-row-head {
+        color: var(--text-3);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 500;
+        padding: 4px 0;
+        border-top: 0;
+      }
+      .set-num {
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--surface-2);
+        color: var(--text-2);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .ex-row[data-done="1"] .set-num {
+        background: var(--accent);
+        color: var(--accent-text);
+      }
+      .set-last {
+        font-size: 12px;
+        color: var(--text-3);
+        text-align: center;
+      }
+      .set-input {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 15px;
+        font-weight: 500;
+        text-align: center;
+        width: 100%;
+        padding: 8px 4px;
+        border-radius: 8px;
+        outline: none;
+      }
+      .set-input:focus {
+        background: var(--surface-2);
+      }
+      .set-input::placeholder {
+        color: var(--text-4);
+      }
+      .set-check {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        border: 1.5px solid var(--border-bright);
+        background: transparent;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: var(--text-3);
+        transition: all 0.15s;
+      }
+      .set-check[data-done="1"] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-text);
+      }
+
+      /* Ex card footer — youtube + notes + alt */
+      .ex-footer {
+        padding: 10px 18px 14px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 8px;
+      }
+      .ex-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--text-2);
+        cursor: pointer;
+        appearance: none;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .ex-action-btn:hover {
+        background: var(--surface-3);
+        color: var(--text);
+      }
+      .alt-panel {
+        padding: 12px 18px 14px;
+        border-top: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .note-panel {
+        padding: 10px 18px 14px;
+        border-top: 1px solid var(--border);
+      }
+      .note-input {
+        width: 100%;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: var(--text);
+        font-size: 13px;
+        resize: none;
+        outline: none;
+        font-family: var(--font);
+      }
+      .note-input:focus {
+        border-color: var(--border-bright);
+      }
+      .note-input::placeholder {
+        color: var(--text-3);
+      }
+
+      /* Rest timer */
+      .timer-bar {
+        margin: 0 0 14px;
+        padding: 14px 18px;
+        background: linear-gradient(
+          135deg,
+          rgba(198, 255, 61, 0.18),
+          rgba(198, 255, 61, 0.06)
+        );
+        border: 1px solid rgba(198, 255, 61, 0.3);
+        border-radius: var(--r-lg);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        overflow: hidden;
+        position: relative;
+      }
+      .timer-bar::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: var(--p, 0%);
+        background: rgba(198, 255, 61, 0.08);
+        transition: width 1s linear;
+      }
+      .timer-bar > * {
+        position: relative;
+        z-index: 1;
+      }
+      .timer-bar .num {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--accent);
+      }
+      .finish-bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 14px 20px max(env(safe-area-inset-bottom), 20px);
+        background: linear-gradient(
+          to top,
+          var(--bg) 50%,
+          rgba(8, 8, 10, 0.85) 85%,
+          transparent
+        );
+        z-index: 5;
+      }
+
+      /* GitHub-style tracker */
+      .tracker-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .tracker-row {
+        display: flex;
+        gap: 3px;
+      }
+      .tracker-cell {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        transition: transform 0.1s;
+      }
+      .tracker-cell:hover {
+        transform: scale(1.3);
+        z-index: 1;
+        position: relative;
+      }
+      .tracker-cell[data-a] {
+        background: var(--day-a);
+        border-color: transparent;
+        box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+      }
+      .tracker-cell[data-b] {
+        background: var(--day-b);
+        border-color: transparent;
+        box-shadow: 0 0 6px rgba(96, 165, 250, 0.4);
+      }
+      .tracker-cell[data-c] {
+        background: var(--day-c);
+        border-color: transparent;
+        box-shadow: 0 0 6px rgba(192, 132, 252, 0.4);
+      }
+      .tracker-cell[data-d] {
+        background: var(--day-d);
+        border-color: transparent;
+        box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
+      }
+      .tracker-cell[data-light] {
+        background: var(--day-light);
+        border-color: transparent;
+      }
+      .tracker-cell[data-mix] {
+        background: var(--day-mix);
+        border-color: transparent;
+        box-shadow: 0 0 6px rgba(244, 114, 182, 0.4);
+      }
+      .tracker-legend {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .tracker-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        color: var(--text-2);
+      }
+      .tracker-legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        flex-shrink: 0;
+      }
+
+      /* Body stats graph area */
+      .stat-switcher {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .stat-chip {
+        padding: 5px 12px;
+        border-radius: var(--r-full);
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        font-size: 12px;
+        color: var(--text-2);
+        cursor: pointer;
+        transition: all 0.15s;
+        appearance: none;
+      }
+      .stat-chip[data-active="1"] {
+        background: rgba(198, 255, 61, 0.12);
+        color: var(--accent);
+        border-color: rgba(198, 255, 61, 0.3);
+      }
+
+      /* PR rows */
+      .pr-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 0;
+        border-top: 1px solid var(--border);
+      }
+      .pr-row:first-child {
+        border-top: 0;
+      }
+      .pr-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: var(--surface-2);
+        display: grid;
+        place-items: center;
+        color: var(--text-2);
+        flex-shrink: 0;
+      }
+      .pr-row[data-fresh="1"] .pr-icon {
+        background: rgba(198, 255, 61, 0.12);
+        color: var(--accent);
+        box-shadow: inset 0 0 0 1px rgba(198, 255, 61, 0.3);
+      }
+      .pr-weight {
+        font-family: var(--font-mono);
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+        text-align: right;
+      }
+      .pr-weight small {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--text-3);
+        margin-left: 2px;
+      }
+      .pr-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent-text);
+        background: var(--accent);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+
+      /* Programs screen */
+      .program-card {
+        border-radius: var(--r-lg);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          transform 0.12s;
+      }
+      .program-card:hover {
+        border-color: var(--border-strong);
+      }
+      .program-type-section {
+        margin-top: 4px;
+      }
+
+      /* Summary */
+      .summary {
+        padding: 40px 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        flex: 1;
+        justify-content: center;
+      }
+      .summary-check {
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-text);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 16px 40px -10px rgba(198, 255, 61, 0.5);
+      }
+      .summary-stats {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .summary-stat {
+        padding: 18px;
+        border-radius: var(--r-lg);
+        background: var(--surface);
+        border: 1px solid var(--border);
+      }
+
+      /* Bar chart */
+      .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 5px;
+        height: 120px;
+        padding: 8px 0 0;
+      }
+      .bar-col {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        height: 100%;
+      }
+      .bar-wrap {
+        flex: 1;
+        width: 100%;
+        display: flex;
+        align-items: flex-end;
+        border-radius: 5px;
+        overflow: hidden;
+        background: var(--surface-2);
+      }
+      .bar {
+        width: 100%;
+        background: linear-gradient(180deg, var(--text-3), var(--text-4));
+        border-radius: 5px 5px 0 0;
+        min-height: 4px;
+      }
+      .bar-col[data-current="1"] .bar {
+        background: linear-gradient(180deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 12px rgba(198, 255, 61, 0.4);
+      }
+      .bar-label {
+        font-size: 10px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      /* Spacing utils */
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .stack-sm {
+        gap: 8px;
+      }
+      .stack-lg {
+        gap: 22px;
+      }
+      .px {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px 2px;
+      }
+      .section-head .label {
+        margin: 0;
+      }
+      .section-head a {
+        color: var(--text-2);
+        font-size: 13px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      @keyframes slide-up {
+        from {
+          transform: translateY(8px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      @keyframes pop-in {
+        0% {
+          transform: scale(0.7);
+        }
+        60% {
+          transform: scale(1.06);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .slide-up {
+        animation: slide-up 0.3s ease forwards;
+      }
+      .pop-in {
+        animation: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      crossorigin
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      crossorigin
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      crossorigin
+    ></script>
+    <script type="text/babel">
+      const { useState, useEffect, useRef, useCallback } = React;
+
+      // ── Icons ──────────────────────────────────────────────────────────────────
+      const Ico = ({ size = 22, sw = 1.6, children, style, className }) => (
+        <svg
+          viewBox="0 0 24 24"
+          width={size}
+          height={size}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={sw}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={style}
+          className={className}
+          aria-hidden
+        >
+          {children}
+        </svg>
+      );
+      const IcoDumbbell = (p) => (
+        <Ico {...p}>
+          <path d="M3 12h2M19 12h2M6 8v8M18 8v8M9 6.5v11M15 6.5v11M9 12h6" />
+        </Ico>
+      );
+      const IcoChart = (p) => (
+        <Ico {...p}>
+          <path d="M4 19h16" />
+          <path d="M7 16V11" />
+          <path d="M12 16V7" />
+          <path d="M17 16v-3" />
+        </Ico>
+      );
+      const IcoLayers = (p) => (
+        <Ico {...p}>
+          <path d="M12 3 3 8l9 5 9-5-9-5Z" />
+          <path d="M3 13l9 5 9-5" />
+          <path d="M3 18l9 5 9-5" />
+        </Ico>
+      );
+      const IcoPlay = (p) => (
+        <Ico {...p} sw={1.8}>
+          <path d="M7 5v14l12-7-12-7Z" fill="currentColor" />
+        </Ico>
+      );
+      const IcoCheck = (p) => (
+        <Ico {...p} sw={2.2}>
+          <path d="M5 12.5 10 17.5 19 7" />
+        </Ico>
+      );
+      const IcoClock = (p) => (
+        <Ico {...p}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </Ico>
+      );
+      const IcoChevRight = (p) => (
+        <Ico {...p}>
+          <path d="M9 6l6 6-6 6" />
+        </Ico>
+      );
+      const IcoX = (p) => (
+        <Ico {...p} sw={1.8}>
+          <path d="M6 6l12 12M18 6 6 18" />
+        </Ico>
+      );
+      const IcoMore = (p) => (
+        <Ico {...p}>
+          <circle cx="5" cy="12" r="1" fill="currentColor" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" />
+          <circle cx="19" cy="12" r="1" fill="currentColor" />
+        </Ico>
+      );
+      const IcoTrophy = (p) => (
+        <Ico {...p}>
+          <path d="M8 21h8" />
+          <path d="M12 17v4" />
+          <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+          <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
+        </Ico>
+      );
+      const IcoTrend = (p) => (
+        <Ico {...p}>
+          <path d="M3 17 9 11l4 4 8-8" />
+          <path d="M14 7h7v7" />
+        </Ico>
+      );
+      const IcoBack = (p) => (
+        <Ico {...p}>
+          <path d="M19 12H5M11 6l-6 6 6 6" />
+        </Ico>
+      );
+      const IcoYoutube = (p) => (
+        <Ico {...p}>
+          <rect x="2" y="5" width="20" height="14" rx="3" />
+          <path d="M10 9l5 3-5 3V9Z" fill="currentColor" />
+        </Ico>
+      );
+      const IcoNote = (p) => (
+        <Ico {...p}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+        </Ico>
+      );
+      const IcoSwap = (p) => (
+        <Ico {...p}>
+          <path d="M7 16V4M7 4 3 8M7 4l4 4" />
+          <path d="M17 8v12M17 20l4-4M17 20l-4-4" />
+        </Ico>
+      );
+      const IcoWeight = (p) => (
+        <Ico {...p}>
+          <circle cx="12" cy="5" r="3" />
+          <path d="M6.5 8h11l2 11h-15Z" />
+          <path d="M9.5 8 8 19M14.5 8l1.5 11" />
+        </Ico>
+      );
+      const IcoCalendar = (p) => (
+        <Ico {...p}>
+          <rect x="3" y="5" width="18" height="16" rx="2.5" />
+          <path d="M3 10h18M8 3v4M16 3v4" />
+        </Ico>
+      );
+      const IcoPlus = (p) => (
+        <Ico {...p}>
+          <path d="M12 5v14M5 12h14" />
+        </Ico>
+      );
+
+      // ── Data ──────────────────────────────────────────────────────────────────
+      const PROGRAMS = [
+        {
+          id: "a",
+          name: "Тренування 1",
+          emoji: "🦵",
+          desc: "Ноги + Руки",
+          color: "var(--day-a)",
+          type: "main",
+          exercises: [
+            {
+              id: "a1",
+              name: "Leg Press",
+              machine: "Жим ногами",
+              note: "Стопи вище — акцент на сідниці",
+              sets: [
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+              ],
+              rest: 90,
+              alt: "Приседання з гантеллю",
+            },
+            {
+              id: "a2",
+              name: "Leg Curl",
+              machine: "Згинання ніг",
+              note: "Валик трохи вище п'ят",
+              sets: [
+                { w: 30, r: 12 },
+                { w: 30, r: 12 },
+                { w: 30, r: 12 },
+              ],
+              rest: 75,
+              alt: "Румунська тяга",
+            },
+            {
+              id: "a3",
+              name: "Romanian DL",
+              machine: "Гантелі",
+              note: "Коліна м'які, таз назад",
+              sets: [
+                { w: 12, r: 12 },
+                { w: 12, r: 12 },
+                { w: 12, r: 12 },
+              ],
+              rest: 90,
+            },
+            {
+              id: "a4",
+              name: "Cable Kickback",
+              machine: "Кросовер",
+              note: "Манжет на щиколотку",
+              sets: [
+                { w: 8, r: 15 },
+                { w: 8, r: 15 },
+                { w: 8, r: 15 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "a5",
+              name: "Abs",
+              machine: "Килимок",
+              note: "",
+              sets: [
+                { w: 0, r: 15 },
+                { w: 0, r: 15 },
+                { w: 0, r: 15 },
+              ],
+              rest: 45,
+            },
+          ],
+        },
+        {
+          id: "b",
+          name: "Тренування 2",
+          emoji: "🍑",
+          desc: "Попа + Прес",
+          color: "var(--day-b)",
+          type: "main",
+          exercises: [
+            {
+              id: "b1",
+              name: "Leg Press",
+              machine: "Жим ногами",
+              note: "Стопи по центру — квадрицепси",
+              sets: [
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+              ],
+              rest: 90,
+              alt: "Зашагування на тумбу",
+            },
+            {
+              id: "b2",
+              name: "Leg Extension",
+              machine: "Розгинання ніг",
+              note: "",
+              sets: [
+                { w: 25, r: 12 },
+                { w: 25, r: 12 },
+                { w: 25, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "b3",
+              name: "Adductor",
+              machine: "Зведення ніг",
+              note: "",
+              sets: [
+                { w: 35, r: 15 },
+                { w: 35, r: 15 },
+                { w: 35, r: 15 },
+              ],
+              rest: 60,
+              alt: "Abductor — відведення ніг",
+            },
+            {
+              id: "b4",
+              name: "Step-up",
+              machine: "Тумба",
+              note: "П'ята не звисає",
+              sets: [
+                { w: 0, r: 12 },
+                { w: 0, r: 12 },
+                { w: 0, r: 12 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "b5",
+              name: "Abs + Планка",
+              machine: "Килимок",
+              note: "",
+              sets: [
+                { w: 0, r: 15 },
+                { w: 0, r: 30 },
+                { w: 0, r: 15 },
+              ],
+              rest: 45,
+            },
+          ],
+        },
+        {
+          id: "c",
+          name: "Тренування 3",
+          emoji: "🏋️",
+          desc: "Верх тіла — Спина + Груди",
+          color: "var(--day-c)",
+          type: "main",
+          exercises: [
+            {
+              id: "c1",
+              name: "Low Row",
+              machine: "Горизонтальна тяга",
+              note: "Зводь лопатки — не руки тягнуть",
+              sets: [
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+              ],
+              rest: 90,
+            },
+            {
+              id: "c2",
+              name: "Chest Press",
+              machine: "Жим від грудей",
+              note: "Руків'я на рівні середини грудей",
+              sets: [
+                { w: 25, r: 12 },
+                { w: 25, r: 12 },
+                { w: 25, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "c3",
+              name: "Pectoral Fly",
+              machine: "Метелик",
+              note: "Лікті ледь зігнуті",
+              sets: [
+                { w: 20, r: 12 },
+                { w: 20, r: 12 },
+                { w: 20, r: 12 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "c4",
+              name: "Tricep Rope",
+              machine: "Кросовер — канат",
+              note: "Лікті до ребер, не рухаються",
+              sets: [
+                { w: 15, r: 12 },
+                { w: 15, r: 12 },
+                { w: 15, r: 12 },
+              ],
+              rest: 60,
+            },
+          ],
+        },
+        {
+          id: "d",
+          name: "Тренування 4",
+          emoji: "💪",
+          desc: "Плечі + Руки",
+          color: "var(--day-d)",
+          type: "main",
+          exercises: [
+            {
+              id: "d1",
+              name: "Shoulder Press",
+              machine: "Жим на плечі",
+              note: "Руків'я на рівні плечей",
+              sets: [
+                { w: 20, r: 12 },
+                { w: 20, r: 12 },
+                { w: 20, r: 12 },
+                { w: 20, r: 12 },
+              ],
+              rest: 90,
+            },
+            {
+              id: "d2",
+              name: "Reverse Fly",
+              machine: "Зворотний метелик",
+              note: "Сядь обличчям ДО спинки",
+              sets: [
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "d3",
+              name: "EZ Bar Curl",
+              machine: "EZ-гриф — біцепс",
+              note: "Лікті притиснуті до тіла",
+              sets: [
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "d4",
+              name: "Abs + Планка",
+              machine: "Килимок",
+              note: "",
+              sets: [
+                { w: 0, r: 15 },
+                { w: 0, r: 40 },
+                { w: 0, r: 15 },
+              ],
+              rest: 45,
+            },
+          ],
+        },
+        {
+          id: "light1",
+          name: "Легке 1",
+          emoji: "🌿",
+          desc: "Дзен — кардіо + розтяжка",
+          color: "var(--day-light)",
+          type: "light",
+          exercises: [
+            {
+              id: "l1a",
+              name: "Еліпс",
+              machine: "Еліптичний тренажер",
+              note: "Спокійний темп, можеш розмовляти",
+              sets: [{ w: 0, r: 40 }],
+              rest: 0,
+            },
+            {
+              id: "l1b",
+              name: "Розтяжка",
+              machine: "Килимок",
+              note: "Кішка-Корова + нахили",
+              sets: [{ w: 0, r: 10 }],
+              rest: 0,
+            },
+          ],
+        },
+        {
+          id: "light2",
+          name: "Легке 2",
+          emoji: "🚶",
+          desc: "М'який тонус — ходьба + гумки",
+          color: "var(--day-light)",
+          type: "light",
+          exercises: [
+            {
+              id: "l2a",
+              name: "Ходьба",
+              machine: "Бігова доріжка",
+              note: "Без нахилу, швидкий темп",
+              sets: [{ w: 0, r: 30 }],
+              rest: 0,
+            },
+            {
+              id: "l2b",
+              name: "Кроки вбік",
+              machine: "Гумки (еспандери)",
+              note: "Гумка вище колін, напівприсяд",
+              sets: [
+                { w: 0, r: 20 },
+                { w: 0, r: 20 },
+                { w: 0, r: 20 },
+              ],
+              rest: 45,
+            },
+            {
+              id: "l2c",
+              name: "Планка",
+              machine: "Килимок",
+              note: "На ліктях, 30-40 сек",
+              sets: [
+                { w: 0, r: 35 },
+                { w: 0, r: 35 },
+                { w: 0, r: 35 },
+              ],
+              rest: 30,
+            },
+          ],
+        },
+        {
+          id: "mix1",
+          name: "Мікс 1",
+          emoji: "🔥",
+          desc: "Full Body — все тіло",
+          color: "var(--day-mix)",
+          type: "mix",
+          exercises: [
+            {
+              id: "m1a",
+              name: "Leg Press",
+              machine: "Жим ногами",
+              note: "Стопи по центру",
+              sets: [
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+                { w: 40, r: 12 },
+              ],
+              rest: 90,
+            },
+            {
+              id: "m1b",
+              name: "Low Row",
+              machine: "Горизонтальна тяга",
+              note: "",
+              sets: [
+                { w: 35, r: 12 },
+                { w: 35, r: 12 },
+                { w: 35, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m1c",
+              name: "Chest Press",
+              machine: "Жим від грудей",
+              note: "",
+              sets: [
+                { w: 22, r: 12 },
+                { w: 22, r: 12 },
+                { w: 22, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m1d",
+              name: "Abs",
+              machine: "Килимок",
+              note: "",
+              sets: [
+                { w: 0, r: 15 },
+                { w: 0, r: 15 },
+                { w: 0, r: 15 },
+              ],
+              rest: 45,
+            },
+          ],
+        },
+        {
+          id: "mix2",
+          name: "Мікс 2",
+          emoji: "🦾",
+          desc: "Бережемо ноги",
+          color: "var(--day-mix)",
+          type: "mix",
+          exercises: [
+            {
+              id: "m2a",
+              name: "Lat Pulldown",
+              machine: "Кросовер — верхній блок",
+              note: "Не тягни за голову — травма плеча",
+              sets: [
+                { w: 30, r: 12 },
+                { w: 30, r: 12 },
+                { w: 30, r: 12 },
+              ],
+              rest: 90,
+            },
+            {
+              id: "m2b",
+              name: "Shoulder Press",
+              machine: "Жим на плечі",
+              note: "",
+              sets: [
+                { w: 18, r: 12 },
+                { w: 18, r: 12 },
+                { w: 18, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m2c",
+              name: "Tricep Rope",
+              machine: "Кросовер — канат",
+              note: "",
+              sets: [
+                { w: 12, r: 12 },
+                { w: 12, r: 12 },
+                { w: 12, r: 12 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "m2d",
+              name: "EZ Bar Curl",
+              machine: "EZ-гриф",
+              note: "",
+              sets: [
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+              ],
+              rest: 60,
+            },
+          ],
+        },
+        {
+          id: "mix3",
+          name: "Мікс 3",
+          emoji: "🪑",
+          desc: "Бережемо верх — все сидячи",
+          color: "var(--day-mix)",
+          type: "mix",
+          exercises: [
+            {
+              id: "m3a",
+              name: "Leg Extension",
+              machine: "Розгинання ніг",
+              note: "",
+              sets: [
+                { w: 25, r: 12 },
+                { w: 25, r: 12 },
+                { w: 25, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m3b",
+              name: "Leg Curl",
+              machine: "Згинання ніг",
+              note: "",
+              sets: [
+                { w: 28, r: 12 },
+                { w: 28, r: 12 },
+                { w: 28, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m3c",
+              name: "Adductor",
+              machine: "Зведення ніг",
+              note: "",
+              sets: [
+                { w: 35, r: 15 },
+                { w: 35, r: 15 },
+                { w: 35, r: 15 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "m3d",
+              name: "Abductor",
+              machine: "Відведення ніг",
+              note: "Той самий тренажер, подушки назовні",
+              sets: [
+                { w: 35, r: 15 },
+                { w: 35, r: 15 },
+                { w: 35, r: 15 },
+              ],
+              rest: 60,
+            },
+          ],
+        },
+        {
+          id: "mix4",
+          name: "Мікс 4",
+          emoji: "🧘",
+          desc: "Куточок інтроверта — гантелі",
+          color: "var(--day-mix)",
+          type: "mix",
+          exercises: [
+            {
+              id: "m4a",
+              name: "Goblet Squat",
+              machine: "Гантелі",
+              note: "Гантель до грудей, лікті між колін",
+              sets: [
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m4b",
+              name: "DB Row",
+              machine: "Гантелі + Лава",
+              note: "Спина паралельна підлозі",
+              sets: [
+                { w: 12, r: 12 },
+                { w: 12, r: 12 },
+                { w: 12, r: 12 },
+              ],
+              rest: 75,
+            },
+            {
+              id: "m4c",
+              name: "Glute Bridge",
+              machine: "Гантелі + Килимок",
+              note: "Гантель на тазу, рушник під гантель",
+              sets: [
+                { w: 15, r: 12 },
+                { w: 15, r: 12 },
+                { w: 15, r: 12 },
+              ],
+              rest: 60,
+            },
+            {
+              id: "m4d",
+              name: "DB Press",
+              machine: "Гантелі + Лава / Килимок",
+              note: "Лікті 45° до тіла",
+              sets: [
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+                { w: 10, r: 12 },
+              ],
+              rest: 75,
+            },
+          ],
+        },
+      ];
+
+      // Mock tracker data — 16 weeks × 7 days
+      const PROGRAM_TYPES = [
+        "a",
+        "b",
+        "c",
+        "d",
+        "light1",
+        "light2",
+        "mix1",
+        "mix2",
+        "mix3",
+        "mix4",
+        null,
+        null,
+      ];
+      function makeTracker() {
+        const weeks = [];
+        const seq = ["a", "b", "c", "d", null, "a", "b"];
+        for (let w = 0; w < 16; w++) {
+          const days = [];
+          for (let d = 0; d < 7; d++) {
+            const val =
+              w < 14 && d < 5 && Math.random() > 0.3
+                ? seq[(w * 7 + d) % 7]
+                : null;
+            days.push(val);
+          }
+          weeks.push(days);
+        }
+        weeks[15][1] = null;
+        weeks[15][2] = null;
+        weeks[15][3] = null;
+        weeks[15][4] = null;
+        weeks[15][5] = null;
+        weeks[15][6] = null;
+        return weeks;
+      }
+      const TRACKER = makeTracker();
+      const DAYS_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+
+      const PRS = [
+        {
+          ex: "Leg Press",
+          weight: 60,
+          reps: 12,
+          when: "Сьогодні",
+          fresh: true,
+        },
+        { ex: "Low Row", weight: 45, reps: 12, when: "3 дні тому" },
+        { ex: "Shoulder Press", weight: 25, reps: 10, when: "Тиждень тому" },
+        { ex: "EZ Curl", weight: 15, reps: 12, when: "2 тижні тому" },
+      ];
+
+      const BODY_STATS = [
+        { date: "Бер", weight: 78, waist: 82, hips: 101, chest: 95 },
+        { date: "Кві", weight: 76.5, waist: 80, hips: 99, chest: 94 },
+        { date: "Тра", weight: 75, waist: 78, hips: 97, chest: 93 },
+        { date: "Чер", weight: 74, waist: 77, hips: 96, chest: 92 },
+        { date: "Лип", weight: 72.5, waist: 75, hips: 94, chest: 91 },
+        { date: "Сер", weight: 71, waist: 74, hips: 93, chest: 90 },
+      ];
+
+      // ── Helpers ───────────────────────────────────────────────────────────────
+      function fmtSec(s) {
+        const h = Math.floor(s / 3600),
+          m = Math.floor((s % 3600) / 60),
+          sec = s % 60;
+        if (h > 0)
+          return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+        return `${m}:${String(sec).padStart(2, "0")}`;
+      }
+      function fmtDate(d = new Date()) {
+        const days = ["Нд", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+        const months = [
+          "січ",
+          "лют",
+          "бер",
+          "кві",
+          "тра",
+          "чер",
+          "лип",
+          "сер",
+          "вер",
+          "жов",
+          "лис",
+          "гру",
+        ];
+        return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+      }
+
+      // ── Topbar ────────────────────────────────────────────────────────────────
+      function Topbar({ title, subtitle, left, right }) {
+        return (
+          <div className="topbar">
+            {left || (
+              <div className="topbar-title">
+                {subtitle && <div className="label">{subtitle}</div>}
+                <div className="h-1">{title}</div>
+              </div>
+            )}
+            <div className="topbar-actions">
+              {right || (
+                <button className="icon-btn">
+                  <IcoCalendar size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // ── Home Screen ───────────────────────────────────────────────────────────
+      function HomeScreen({ onStart }) {
+        const today = fmtDate();
+        const mainProgs = PROGRAMS.filter((p) => p.type === "main");
+        const lightProgs = PROGRAMS.filter((p) => p.type === "light");
+        const mixProgs = PROGRAMS.filter((p) => p.type === "mix");
+
+        return (
+          <div className="screen">
+            <Topbar title="Тренування" subtitle={today} />
+            <div className="px stack" style={{ paddingTop: 6, gap: 20 }}>
+              {/* Main programs */}
+              <div>
+                <div className="section-head" style={{ marginBottom: 10 }}>
+                  <div className="label">Основні</div>
+                  <span className="meta num">4 дні / тиждень</span>
+                </div>
+                <div className="stack" style={{ gap: 8 }}>
+                  {mainProgs.map((p) => (
+                    <button
+                      key={p.id}
+                      className="prog-select-card"
+                      onClick={() => onStart(p)}
+                    >
+                      <div
+                        className="prog-icon"
+                        style={{ background: `${p.color}18` }}
+                      >
+                        <span>{p.emoji}</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span style={{ fontSize: 16, fontWeight: 600 }}>
+                            {p.name}
+                          </span>
+                          <span
+                            className="chip-dot"
+                            style={{
+                              background: p.color,
+                              width: 7,
+                              height: 7,
+                              borderRadius: "50%",
+                            }}
+                          />
+                        </div>
+                        <div className="meta" style={{ marginTop: 2 }}>
+                          {p.desc}
+                        </div>
+                      </div>
+                      <IcoChevRight
+                        size={18}
+                        style={{ color: "var(--text-3)" }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="prog-divider" />
+
+              {/* Light programs */}
+              <div>
+                <div className="section-head" style={{ marginBottom: 10 }}>
+                  <div className="label">Легкі</div>
+                  <span className="meta" style={{ fontSize: 11 }}>
+                    коли немає сил
+                  </span>
+                </div>
+                <div className="stack" style={{ gap: 8 }}>
+                  {lightProgs.map((p) => (
+                    <button
+                      key={p.id}
+                      className="prog-select-card"
+                      onClick={() => onStart(p)}
+                    >
+                      <div
+                        className="prog-icon"
+                        style={{ background: "rgba(107,114,128,0.12)" }}
+                      >
+                        <span>{p.emoji}</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 15, fontWeight: 600 }}>
+                          {p.name}
+                        </span>
+                        <div className="meta" style={{ marginTop: 2 }}>
+                          {p.desc}
+                        </div>
+                      </div>
+                      <IcoChevRight
+                        size={18}
+                        style={{ color: "var(--text-3)" }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mix programs */}
+              <div>
+                <div className="section-head" style={{ marginBottom: 10 }}>
+                  <div className="label">Міксові</div>
+                  <span className="meta" style={{ fontSize: 11 }}>
+                    різноманіття
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {mixProgs.map((p) => (
+                    <button
+                      key={p.id}
+                      className="prog-select-card"
+                      style={{
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        padding: "14px",
+                      }}
+                      onClick={() => onStart(p)}
+                    >
+                      <span style={{ fontSize: 22 }}>{p.emoji}</span>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {p.name}
+                        </div>
+                        <div
+                          className="meta"
+                          style={{ fontSize: 11, marginTop: 2 }}
+                        >
+                          {p.desc}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ── Workout Screen ────────────────────────────────────────────────────────
+      function WorkoutScreen({ program, onExit, onFinish }) {
+        const [setData, setSetData] = useState(() => {
+          const init = {};
+          program.exercises.forEach((ex) =>
+            ex.sets.forEach((s, i) => {
+              init[`${ex.id}:${i}`] = { weight: s.w, reps: s.r, done: false };
+            }),
+          );
+          return init;
+        });
+        const [elapsed, setElapsed] = useState(0);
+        const [rest, setRest] = useState({
+          active: false,
+          total: 0,
+          remaining: 0,
+        });
+        const [openAlt, setOpenAlt] = useState({});
+        const [openNote, setOpenNote] = useState({});
+        const [notes, setNotes] = useState({});
+
+        useEffect(() => {
+          const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+          return () => clearInterval(t);
+        }, []);
+        useEffect(() => {
+          if (!rest.active) return;
+          const t = setInterval(
+            () =>
+              setRest((r) => {
+                if (!r.active) return r;
+                const next = r.remaining - 1;
+                if (next <= 0) return { active: false, total: 0, remaining: 0 };
+                return { ...r, remaining: next };
+              }),
+            1000,
+          );
+          return () => clearInterval(t);
+        }, [rest.active]);
+
+        const toggleSet = (exId, idx, restSec) => {
+          const key = `${exId}:${idx}`;
+          const cur = setData[key];
+          setSetData((s) => ({ ...s, [key]: { ...cur, done: !cur.done } }));
+          if (!cur.done && restSec > 0)
+            setRest({ active: true, total: restSec, remaining: restSec });
+          // Vibrate if available
+          if (!cur.done && navigator.vibrate) navigator.vibrate(40);
+        };
+        const updateSet = (exId, idx, field, val) => {
+          const key = `${exId}:${idx}`;
+          setSetData((s) => ({ ...s, [key]: { ...s[key], [field]: val } }));
+        };
+
+        const total = Object.keys(setData).length;
+        const done = Object.values(setData).filter((s) => s.done).length;
+        const progress = total ? done / total : 0;
+
+        const handleFinish = () => {
+          const vol = Object.values(setData)
+            .filter((s) => s.done)
+            .reduce((n, s) => n + (s.weight || 0) * (s.reps || 0), 0);
+          onFinish({ duration: elapsed, done, total, volume: vol, program });
+        };
+
+        return (
+          <div className="screen" style={{ paddingBottom: 120 }}>
+            {/* Topbar */}
+            <div className="topbar" style={{ paddingBottom: 0 }}>
+              <button className="icon-btn" onClick={onExit}>
+                <IcoBack size={18} />
+              </button>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <div className="label">
+                  {program.name} · {program.desc}
+                </div>
+                <div className="num" style={{ fontSize: 18, fontWeight: 600 }}>
+                  {fmtSec(elapsed)}
+                </div>
+              </div>
+              <button className="icon-btn">
+                <IcoMore size={18} />
+              </button>
+            </div>
+
+            {/* Progress bar */}
+            <div className="px" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <div
+                style={{
+                  height: 4,
+                  borderRadius: 4,
+                  background: "var(--surface-2)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.round(progress * 100)}%`,
+                    height: "100%",
+                    background:
+                      "linear-gradient(90deg,var(--accent-2),var(--accent))",
+                    transition: "width .3s",
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: "var(--text-3)",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                }}
+              >
+                <span>
+                  {done} з {total} підходів
+                </span>
+                <span className="num">{Math.round(progress * 100)}%</span>
+              </div>
+            </div>
+
+            {/* Rest timer */}
+            {rest.active && (
+              <div className="px">
+                <div
+                  className="timer-bar"
+                  style={{
+                    "--p": `${rest.total ? Math.max(0, 100 - (rest.remaining / rest.total) * 100) : 0}%`,
+                  }}
+                >
+                  <div>
+                    <div
+                      className="label"
+                      style={{ color: "rgba(198,255,61,0.85)" }}
+                    >
+                      Відпочинок
+                    </div>
+                    <div className="num">{fmtSec(rest.remaining)}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      className="btn btn-sm btn-dark"
+                      onClick={() =>
+                        setRest((r) => ({ ...r, remaining: r.remaining + 15 }))
+                      }
+                      style={{ padding: "8px 12px", borderRadius: 10 }}
+                    >
+                      +15с
+                    </button>
+                    <button
+                      className="btn btn-sm btn-dark"
+                      onClick={() =>
+                        setRest({ active: false, total: 0, remaining: 0 })
+                      }
+                      style={{ padding: "8px 12px", borderRadius: 10 }}
+                    >
+                      Пропустити
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Exercises */}
+            <div className="px stack" style={{ gap: 12 }}>
+              {program.exercises.map((ex, idx) => {
+                const allDone = ex.sets.every(
+                  (_, i) => setData[`${ex.id}:${i}`]?.done,
+                );
+                return (
+                  <div
+                    key={ex.id}
+                    className="ex-card"
+                    data-done={allDone ? "1" : "0"}
+                  >
+                    {/* Head */}
+                    <div className="ex-head">
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 12,
+                          alignItems: "flex-start",
+                          flex: 1,
+                        }}
+                      >
+                        <div className="ex-machine-photo">
+                          <IcoDumbbell
+                            size={24}
+                            style={{ color: "var(--text-3)" }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="ex-name">{ex.name}</div>
+                          <div className="ex-note">{ex.machine}</div>
+                          {ex.note && (
+                            <div
+                              className="ex-note"
+                              style={{
+                                marginTop: 2,
+                                color: "var(--text-4)",
+                                fontSize: 11,
+                              }}
+                            >
+                              💡 {ex.note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="icon-btn"
+                        style={{ width: 32, height: 32, borderRadius: 10 }}
+                      >
+                        <IcoMore size={16} />
+                      </button>
+                    </div>
+
+                    {/* Sets table */}
+                    <div className="ex-table">
+                      <div className="ex-row ex-row-head">
+                        <div>#</div>
+                        <div>Минулого</div>
+                        <div>Вага</div>
+                        <div>Повт.</div>
+                        <div />
+                      </div>
+                      {ex.sets.map((s, i) => {
+                        const key = `${ex.id}:${i}`;
+                        const st = setData[key];
+                        return (
+                          <div
+                            key={i}
+                            className="ex-row"
+                            data-done={st.done ? "1" : "0"}
+                          >
+                            <div className="set-num">{i + 1}</div>
+                            <div className="set-last">
+                              {s.w > 0
+                                ? `${s.w}×${s.r}`
+                                : s.r > 60
+                                  ? `${s.r}хв`
+                                  : `${s.r}повт`}
+                            </div>
+                            <input
+                              className="set-input"
+                              type="text"
+                              inputMode="decimal"
+                              value={st.weight || ""}
+                              placeholder={s.w > 0 ? String(s.w) : "—"}
+                              onChange={(e) =>
+                                updateSet(
+                                  ex.id,
+                                  i,
+                                  "weight",
+                                  Number(e.target.value.replace(",", ".")) || 0,
+                                )
+                              }
+                            />
+                            <input
+                              className="set-input"
+                              type="text"
+                              inputMode="numeric"
+                              value={st.reps || ""}
+                              placeholder={String(s.r)}
+                              onChange={(e) =>
+                                updateSet(
+                                  ex.id,
+                                  i,
+                                  "reps",
+                                  Number(e.target.value) || 0,
+                                )
+                              }
+                            />
+                            <button
+                              className="set-check"
+                              data-done={st.done ? "1" : "0"}
+                              onClick={() => toggleSet(ex.id, i, ex.rest || 60)}
+                            >
+                              {st.done && <IcoCheck size={16} sw={2.6} />}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer — YouTube, Notes, Alt */}
+                    <div className="ex-footer">
+                      {ex.youtube && (
+                        <button
+                          className="ex-action-btn"
+                          onClick={() => window.open(ex.youtube, "_blank")}
+                        >
+                          <IcoYoutube size={13} /> Відео
+                        </button>
+                      )}
+                      <button
+                        className="ex-action-btn"
+                        onClick={() =>
+                          setOpenNote((n) => ({ ...n, [ex.id]: !n[ex.id] }))
+                        }
+                      >
+                        <IcoNote size={13} /> Нотатки
+                      </button>
+                      {ex.alt && (
+                        <button
+                          className="ex-action-btn"
+                          onClick={() =>
+                            setOpenAlt((a) => ({ ...a, [ex.id]: !a[ex.id] }))
+                          }
+                        >
+                          <IcoSwap size={13} />{" "}
+                          {openAlt[ex.id] ? "Закрити" : "Замінити"}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Notes panel */}
+                    {openNote[ex.id] && (
+                      <div className="note-panel">
+                        <div className="label" style={{ marginBottom: 6 }}>
+                          Мої налаштування
+                        </div>
+                        <textarea
+                          className="note-input"
+                          rows={2}
+                          placeholder="Висота сидіння, позиція валиків…"
+                          value={notes[ex.id] || ""}
+                          onChange={(e) =>
+                            setNotes((n) => ({ ...n, [ex.id]: e.target.value }))
+                          }
+                        />
+                      </div>
+                    )}
+
+                    {/* Alt panel */}
+                    {openAlt[ex.id] && ex.alt && (
+                      <div className="alt-panel">
+                        <div className="label" style={{ marginBottom: 6 }}>
+                          Альтернатива
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <div
+                            className="ex-machine-photo"
+                            style={{ width: 36, height: 36 }}
+                          >
+                            <IcoSwap
+                              size={18}
+                              style={{ color: "var(--text-3)" }}
+                            />
+                          </div>
+                          <div style={{ fontSize: 14, color: "var(--text-2)" }}>
+                            {ex.alt}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="finish-bar">
+              <button
+                className="btn btn-primary btn-block"
+                onClick={handleFinish}
+              >
+                <IcoCheck size={16} sw={2.4} /> Завершити тренування
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // ── Summary Screen ────────────────────────────────────────────────────────
+      function SummaryScreen({ stats, onHome }) {
+        const min = Math.floor(stats.duration / 60),
+          sec = stats.duration % 60;
+        // Calorie estimate (MET-based, assuming ~65kg body weight)
+        const kcal = Math.round(5.0 * 65 * (stats.duration / 3600));
+        return (
+          <div className="screen">
+            <div className="topbar">
+              <div className="topbar-title">
+                <div className="label">Тренування завершено</div>
+              </div>
+              <button className="icon-btn" onClick={onHome}>
+                <IcoX size={18} />
+              </button>
+            </div>
+            <div className="summary">
+              <div className="summary-check pop-in">
+                <IcoCheck size={42} sw={2.6} />
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <h1
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 600,
+                    letterSpacing: "-0.025em",
+                    margin: 0,
+                  }}
+                >
+                  Чудова робота!
+                </h1>
+                <div className="meta" style={{ marginTop: 8 }}>
+                  {stats.program.name} · {stats.program.desc}
+                </div>
+              </div>
+              <div className="summary-stats">
+                <div className="summary-stat">
+                  <div className="stat-label">Тривалість</div>
+                  <div
+                    className="stat-value num"
+                    style={{ marginTop: 6, fontSize: 26 }}
+                  >
+                    {min}
+                    <small style={{ fontSize: 13, color: "var(--text-3)" }}>
+                      хв
+                    </small>
+                  </div>
+                </div>
+                <div className="summary-stat">
+                  <div className="stat-label">Підходи</div>
+                  <div
+                    className="stat-value num"
+                    style={{ marginTop: 6, fontSize: 26 }}
+                  >
+                    {stats.done}
+                    <small style={{ fontSize: 13, color: "var(--text-3)" }}>
+                      /{stats.total}
+                    </small>
+                  </div>
+                </div>
+                <div className="summary-stat">
+                  <div className="stat-label">Об'єм</div>
+                  <div
+                    className="stat-value num"
+                    style={{ marginTop: 6, fontSize: 22 }}
+                  >
+                    {stats.volume}
+                    <small style={{ fontSize: 12, color: "var(--text-3)" }}>
+                      кг
+                    </small>
+                  </div>
+                </div>
+                <div
+                  className="summary-stat"
+                  style={{
+                    background: "rgba(198,255,61,0.08)",
+                    borderColor: "rgba(198,255,61,0.3)",
+                  }}
+                >
+                  <div
+                    className="stat-label"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    ≈ Спалено
+                  </div>
+                  <div
+                    className="stat-value num"
+                    style={{
+                      marginTop: 6,
+                      fontSize: 22,
+                      color: "var(--accent)",
+                    }}
+                  >
+                    {kcal}
+                    <small
+                      style={{
+                        fontSize: 12,
+                        color: "var(--accent)",
+                        opacity: 0.7,
+                      }}
+                    >
+                      ккал
+                    </small>
+                  </div>
+                </div>
+              </div>
+              <button className="btn btn-primary btn-block" onClick={onHome}>
+                На головну
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // ── Progress Screen ───────────────────────────────────────────────────────
+      const TRACKER_COLORS = {
+        a: "var(--day-a)",
+        b: "var(--day-b)",
+        c: "var(--day-c)",
+        d: "var(--day-d)",
+        light1: "var(--day-light)",
+        light2: "var(--day-light)",
+        mix1: "var(--day-mix)",
+        mix2: "var(--day-mix)",
+        mix3: "var(--day-mix)",
+        mix4: "var(--day-mix)",
+      };
+      const PROGRAM_NAMES = {
+        a: "День А",
+        b: "День Б",
+        c: "День В",
+        d: "День Г",
+        light1: "Легке",
+        light2: "Легке",
+        mix1: "Мікс",
+        mix2: "Мікс",
+        mix3: "Мікс",
+        mix4: "Мікс",
+      };
+
+      function ProgressScreen() {
+        const [activeStat, setActiveStat] = useState("weight");
+        const statKeys = [
+          { id: "weight", label: "Вага" },
+          { id: "waist", label: "Талія" },
+          { id: "hips", label: "Стегна" },
+          { id: "chest", label: "Груди" },
+        ];
+        const statData = BODY_STATS.map((d) => ({
+          date: d.date,
+          value: d[activeStat],
+        }));
+        const totalWorkouts = TRACKER.flat().filter(Boolean).length;
+        const streakWeeks = 4;
+
+        return (
+          <div className="screen">
+            <Topbar title="Прогрес" subtitle="Статистика" />
+            <div className="px stack" style={{ paddingTop: 6, gap: 20 }}>
+              {/* Stats row */}
+              <div className="stats">
+                <div className="stat">
+                  <div className="stat-label">Тренувань</div>
+                  <div className="stat-value num">{totalWorkouts}</div>
+                  <div className="stat-sub">цього місяця</div>
+                </div>
+                <div className="stat">
+                  <div className="stat-label">Streak</div>
+                  <div className="stat-value num">{streakWeeks}</div>
+                  <div className="stat-sub">тижні поспіль</div>
+                </div>
+                <div className="stat">
+                  <div className="stat-label">Цього тижня</div>
+                  <div className="stat-value num stat-up">
+                    {TRACKER[TRACKER.length - 1].filter(Boolean).length}
+                  </div>
+                  <div className="stat-sub">тренувань</div>
+                </div>
+              </div>
+
+              {/* Attendance tracker */}
+              <div className="card">
+                <div className="card-row" style={{ marginBottom: 12 }}>
+                  <div>
+                    <div className="h-3">Відвідування</div>
+                    <div className="meta" style={{ marginTop: 2 }}>
+                      16 тижнів
+                    </div>
+                  </div>
+                </div>
+                {/* Day labels */}
+                <div style={{ display: "flex", gap: 3, marginBottom: 3 }}>
+                  <div
+                    style={{ width: 20, fontSize: 9, color: "var(--text-3)" }}
+                  />
+                  {DAYS_SHORT.map((d) => (
+                    <div
+                      key={d}
+                      style={{
+                        width: 16,
+                        fontSize: 9,
+                        color: "var(--text-3)",
+                        textAlign: "center",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+                {/* Grid */}
+                <div className="tracker-grid">
+                  {TRACKER.map((week, wi) => (
+                    <div
+                      key={wi}
+                      className="tracker-row"
+                      style={{ alignItems: "center" }}
+                    >
+                      <div
+                        style={{
+                          width: 20,
+                          fontSize: 9,
+                          color: "var(--text-3)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {wi % 4 === 0 ? `Т${wi + 1}` : ""}
+                      </div>
+                      {week.map((day, di) => {
+                        const attrs = {};
+                        if (day === "a") attrs["data-a"] = "";
+                        else if (day === "b") attrs["data-b"] = "";
+                        else if (day === "c") attrs["data-c"] = "";
+                        else if (day === "d") attrs["data-d"] = "";
+                        else if (day && day.startsWith("light"))
+                          attrs["data-light"] = "";
+                        else if (day && day.startsWith("mix"))
+                          attrs["data-mix"] = "";
+                        return (
+                          <div
+                            key={di}
+                            className="tracker-cell"
+                            {...attrs}
+                            title={
+                              day
+                                ? `${PROGRAM_NAMES[day] || day}`
+                                : "Відпочинок"
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                {/* Legend */}
+                <div className="tracker-legend">
+                  {[
+                    { label: "Тренування 1", color: "var(--day-a)" },
+                    { label: "Тренування 2", color: "var(--day-b)" },
+                    { label: "Тренування 3", color: "var(--day-c)" },
+                    { label: "Тренування 4", color: "var(--day-d)" },
+                    { label: "Легке", color: "var(--day-light)" },
+                    { label: "Мікс", color: "var(--day-mix)" },
+                  ].map((l) => (
+                    <div key={l.label} className="tracker-legend-item">
+                      <div
+                        className="tracker-legend-dot"
+                        style={{ background: l.color }}
+                      />
+                      {l.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Body stats graph */}
+              <div className="card">
+                <div className="card-row" style={{ marginBottom: 12 }}>
+                  <div>
+                    <div className="h-3">Заміри тіла</div>
+                    <div className="meta" style={{ marginTop: 2 }}>
+                      6 місяців
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div
+                      className="num"
+                      style={{ fontSize: 22, fontWeight: 600 }}
+                    >
+                      {statData[statData.length - 1]?.value}
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: "var(--text-3)",
+                          marginLeft: 3,
+                        }}
+                      >
+                        {activeStat === "weight" ? "кг" : "см"}
+                      </span>
+                    </div>
+                    <div className="meta stat-up" style={{ fontSize: 12 }}>
+                      ↓{" "}
+                      {(
+                        statData[0]?.value -
+                        statData[statData.length - 1]?.value
+                      ).toFixed(1)}
+                      {activeStat === "weight" ? "кг" : "см"}
+                    </div>
+                  </div>
+                </div>
+                {/* Switcher */}
+                <div className="stat-switcher">
+                  {statKeys.map((k) => (
+                    <button
+                      key={k.id}
+                      className="stat-chip"
+                      data-active={activeStat === k.id ? "1" : "0"}
+                      onClick={() => setActiveStat(k.id)}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                {/* Chart */}
+                <BodyLineChart data={statData} />
+              </div>
+
+              {/* PRs */}
+              <div>
+                <div className="section-head" style={{ marginBottom: 8 }}>
+                  <div className="label">Особисті рекорди</div>
+                </div>
+                <div className="card" style={{ padding: "0 18px" }}>
+                  {PRS.map((pr, i) => (
+                    <div
+                      key={i}
+                      className="pr-row"
+                      data-fresh={pr.fresh ? "1" : "0"}
+                    >
+                      <div className="pr-icon">
+                        <IcoTrophy size={18} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <div style={{ fontSize: 15, fontWeight: 500 }}>
+                            {pr.ex}
+                          </div>
+                          {pr.fresh && <span className="pr-badge">NEW</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                          {pr.when}
+                        </div>
+                      </div>
+                      <div className="pr-weight">
+                        {pr.weight}
+                        <small>кг × {pr.reps}</small>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function BodyLineChart({ data }) {
+        const W = 320,
+          H = 120,
+          P = 16;
+        const vals = data.map((d) => d.value);
+        const min = Math.min(...vals) - 1,
+          max = Math.max(...vals) + 1;
+        const xStep = (W - P * 2) / (data.length - 1);
+        const pts = data.map((d, i) => ({
+          x: P + i * xStep,
+          y: P + (1 - (d.value - min) / (max - min)) * (H - P * 2),
+          label: d.date,
+          val: d.value,
+        }));
+        const pathD = pts.reduce((acc, p, i, arr) => {
+          if (i === 0) return `M ${p.x} ${p.y}`;
+          const prev = arr[i - 1],
+            cpx = (prev.x + p.x) / 2;
+          return acc + ` C ${cpx} ${prev.y}, ${cpx} ${p.y}, ${p.x} ${p.y}`;
+        }, "");
+        const areaD =
+          pathD +
+          ` L ${pts[pts.length - 1].x} ${H - P} L ${pts[0].x} ${H - P} Z`;
+        return (
+          <div style={{ position: "relative", height: H, width: "100%" }}>
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              width="100%"
+              height="100%"
+              preserveAspectRatio="none"
+              style={{ overflow: "visible" }}
+            >
+              <defs>
+                <linearGradient id="bodyFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor="var(--accent)"
+                    stopOpacity="0.25"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--accent)"
+                    stopOpacity="0"
+                  />
+                </linearGradient>
+              </defs>
+              {[0, 0.5, 1].map((t, i) => (
+                <line
+                  key={i}
+                  x1={P}
+                  x2={W - P}
+                  y1={P + t * (H - P * 2)}
+                  y2={P + t * (H - P * 2)}
+                  stroke="var(--border)"
+                  strokeDasharray="2 4"
+                />
+              ))}
+              <path d={areaD} fill="url(#bodyFill)" />
+              <path
+                d={pathD}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              {pts.map((p, i) => (
+                <g key={i}>
+                  {i === pts.length - 1 && (
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r="6"
+                      fill="var(--accent)"
+                      opacity="0.25"
+                    />
+                  )}
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={i === pts.length - 1 ? 4 : 2.5}
+                    fill={
+                      i === pts.length - 1 ? "var(--accent)" : "var(--text-2)"
+                    }
+                  />
+                </g>
+              ))}
+            </svg>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 6,
+                padding: "0 4px",
+              }}
+            >
+              {pts.map((p, i) => (
+                <div
+                  key={i}
+                  style={{
+                    fontSize: 10,
+                    color: "var(--text-3)",
+                    fontWeight: i === pts.length - 1 ? 600 : 500,
+                  }}
+                >
+                  {p.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // ── Programs Screen ───────────────────────────────────────────────────────
+      function ProgramsScreen({ onStart }) {
+        const mainProgs = PROGRAMS.filter((p) => p.type === "main");
+        const lightProgs = PROGRAMS.filter((p) => p.type === "light");
+        const mixProgs = PROGRAMS.filter((p) => p.type === "mix");
+
+        return (
+          <div className="screen">
+            <Topbar title="Програми" subtitle={`${PROGRAMS.length} програм`} />
+            <div className="px stack" style={{ paddingTop: 6, gap: 20 }}>
+              <ProgramSection
+                title="Основні — 4 дні на тиждень"
+                programs={mainProgs}
+                onStart={onStart}
+              />
+              <ProgramSection
+                title="Легкі"
+                programs={lightProgs}
+                onStart={onStart}
+              />
+              <ProgramSection
+                title="Міксові"
+                programs={mixProgs}
+                onStart={onStart}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      function ProgramSection({ title, programs, onStart }) {
+        return (
+          <div>
+            <div className="section-head" style={{ marginBottom: 10 }}>
+              <div className="label">{title}</div>
+            </div>
+            <div className="stack" style={{ gap: 10 }}>
+              {programs.map((p) => (
+                <div
+                  key={p.id}
+                  className="program-card"
+                  style={{
+                    background:
+                      p.type === "main"
+                        ? `radial-gradient(80% 70% at 100% 0%,${p.color}14,transparent),var(--surface)`
+                        : "var(--surface)",
+                    borderColor:
+                      p.type === "main" ? `${p.color}40` : "var(--border)",
+                  }}
+                >
+                  <div className="card-row">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 20 }}>{p.emoji}</span>
+                        <div className="h-2">{p.name}</div>
+                        <div
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: p.color,
+                            flexShrink: 0,
+                          }}
+                        />
+                      </div>
+                      <div className="meta" style={{ marginTop: 4 }}>
+                        {p.desc}
+                      </div>
+                    </div>
+                    <button
+                      className="icon-btn"
+                      style={{ width: 32, height: 32, borderRadius: 10 }}
+                    >
+                      <IcoMore size={16} />
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {p.exercises.map((ex, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          padding: "4px 8px",
+                          background: "var(--bg-2,var(--surface-2))",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          fontSize: 11,
+                          color: "var(--text-2)",
+                        }}
+                      >
+                        {ex.name}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ flex: 1 }}
+                    >
+                      Переглянути
+                    </button>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{ flex: 1 }}
+                      onClick={() => onStart(p)}
+                    >
+                      <IcoPlay size={14} sw={2} /> Почати
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // ── App ───────────────────────────────────────────────────────────────────
+      function App() {
+        const [tab, setTab] = useState("home");
+        const [view, setView] = useState("home"); // home | workout | summary
+        const [selectedProgram, setSelectedProgram] = useState(null);
+        const [summary, setSummary] = useState(null);
+
+        const startWorkout = (prog) => {
+          setSelectedProgram(prog);
+          setView("workout");
+        };
+        const finishWorkout = (stats) => {
+          setSummary(stats);
+          setView("summary");
+        };
+        const exitToHome = () => {
+          setView("home");
+          setTab("home");
+          setSummary(null);
+          setSelectedProgram(null);
+        };
+
+        const showNav = view === "home";
+
+        let screen;
+        if (view === "workout")
+          screen = (
+            <WorkoutScreen
+              program={selectedProgram}
+              onExit={() => setView("home")}
+              onFinish={finishWorkout}
+            />
+          );
+        else if (view === "summary")
+          screen = <SummaryScreen stats={summary} onHome={exitToHome} />;
+        else if (tab === "home") screen = <HomeScreen onStart={startWorkout} />;
+        else if (tab === "progress") screen = <ProgressScreen />;
+        else screen = <ProgramsScreen onStart={startWorkout} />;
+
+        const navItems = [
+          { id: "home", label: "Тренування", Icon: IcoDumbbell },
+          { id: "progress", label: "Прогрес", Icon: IcoChart },
+          { id: "programs", label: "Програми", Icon: IcoLayers },
+        ];
+
+        return (
+          <div className="stage">
+            <div className="app">
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  minHeight: 0,
+                }}
+              >
+                {screen}
+              </div>
+              {showNav && (
+                <div className="nav">
+                  <div className="nav-inner">
+                    {navItems.map(({ id, label, Icon }) => {
+                      const active = tab === id;
+                      return (
+                        <button
+                          key={id}
+                          className="nav-btn"
+                          data-active={active ? "1" : "0"}
+                          onClick={() => {
+                            setTab(id);
+                            setView("home");
+                          }}
+                        >
+                          <Icon size={20} sw={active ? 2 : 1.6} />
+                          <span className="nav-label">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
