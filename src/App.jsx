@@ -7,6 +7,7 @@ import Workout from './pages/Workout'
 import Progress from './pages/Progress'
 import Programs from './pages/Programs'
 import ProgramDetail from './pages/ProgramDetail'
+import ProgramEdit from './pages/ProgramEdit'
 import ActiveWorkout from './pages/ActiveWorkout'
 import BodyStats from './pages/BodyStats'
 
@@ -25,7 +26,9 @@ function AppRoutes() {
             <Route path="/" element={<Workout />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/programs" element={<Programs />} />
+            <Route path="/programs/new" element={<ProgramEdit />} />
             <Route path="/programs/:id" element={<ProgramDetail />} />
+            <Route path="/programs/:id/edit" element={<ProgramEdit />} />
             <Route path="/workout/:programId" element={<ActiveWorkout />} />
             <Route path="/progress/body" element={<BodyStats />} />
           </Routes>

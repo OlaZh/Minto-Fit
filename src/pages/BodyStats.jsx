@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { IconArrowLeft } from '../components/Icons'
 
 const FIELDS = [
   { key: 'weight_kg', label: 'Вага', unit: 'кг', step: 0.1 },
@@ -103,7 +104,7 @@ export default function BodyStats() {
   return (
     <div className="screen screen--no-nav">
       <div className="topbar">
-        <button type="button" className="icon-btn" onClick={() => navigate('/progress')}>←</button>
+        <button type="button" className="icon-btn" onClick={() => navigate('/progress')}><IconArrowLeft size={20} /></button>
         <div className="topbar-title" style={{ alignItems: 'center', textAlign: 'center', flex: 1 }}>
           <div className="label">Заміри</div>
           <div className="h-3">Зміни тіла</div>

@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
+import ProfileSheet from '../components/ProfileSheet'
+import { IconUser, IconTrophy, IconX } from '../components/Icons'
 
 const DAY_MS = 86400000
 const WEEKS = 16
+const YEAR_WEEKS = 52
+
+// Sun=0, Mon=1…Sat=6 — display Mon→Sun (Ukrainian convention)
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
+const DAY_LABEL = { 0: 'нд', 1: 'пн', 2: 'вт', 3: 'ср', 4: 'чт', 5: 'пт', 6: 'сб' }
 
 const BODY_FIELDS = [
   { key: 'weight_kg', label: 'Вага', unit: 'кг' },
@@ -25,10 +32,13 @@ export default function Progress() {
   const [loading, setLoading] = useState(true)
   const [bodyMode, setBodyMode] = useState('weight')
   const [otherField, setOtherField] = useState('waist')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [trackerOpen, setTrackerOpen] = useState(false)
+  const yearScrollRef = useRef(null)
 
   useEffect(() => {
     async function load() {
-      const since = new Date(Date.now() - WEEKS * 7 * DAY_MS).toISOString()
+      const since = new Date(Date.now() - YEAR_WEEKS * 7 * DAY_MS).toISOString()
 
       const [{ data: loadedWorkouts }, { data: sets }, { data: stats }] = await Promise.all([
         supabase
@@ -125,6 +135,23 @@ export default function Progress() {
     weeks.push(grid.slice(index, index + 7))
   }
 
+  const yearStartDay = new Date(today)
+  yearStartDay.setDate(today.getDate() - today.getDay() - (YEAR_WEEKS - 1) * 7)
+  const yearGrid = []
+  for (let date = new Date(yearStartDay); date <= today; date.setDate(date.getDate() + 1)) {
+    yearGrid.push(new Date(date))
+  }
+  const yearWeeks = []
+  for (let i = 0; i < yearGrid.length; i += 7) {
+    yearWeeks.push(yearGrid.slice(i, i + 7))
+  }
+
+  useEffect(() => {
+    if (trackerOpen && yearScrollRef.current) {
+      yearScrollRef.current.scrollLeft = yearScrollRef.current.scrollWidth
+    }
+  }, [trackerOpen])
+
   const chartData = useMemo(() => {
     return bodyStats
       .filter(item => item[activeFieldKey] != null)
@@ -177,11 +204,11 @@ export default function Progress() {
           <div className="h-1">Прогрес</div>
         </div>
         <div className="topbar-actions">
-          <button type="button" className="icon-btn" aria-label="Календар">🗓️</button>
+          <button type="button" className="icon-btn" aria-label="Профіль" onClick={() => setProfileOpen(true)}><IconUser size={20} /></button>
         </div>
       </div>
 
-      <div className="page stack" style={{ paddingTop: 6, gap: 20 }}>
+      <div className="page stack" style={{ paddingTop: 20, gap: 24 }}>
         <section className="stats">
           <div className="stat">
             <div className="stat-label">Тренувань</div>
@@ -200,22 +227,39 @@ export default function Progress() {
           </div>
         </section>
 
-        <section className="card">
-          <div className="card-row" style={{ marginBottom: 14 }}>
+        <section className="card" style={{ cursor: 'pointer' }} onClick={() => setTrackerOpen(true)}>
+          <div className="card-row" style={{ marginBottom: 20 }}>
             <div>
               <div className="h-3">Відвідування</div>
-              <div className="meta" style={{ marginTop: 2 }}>Останні 16 тижнів</div>
+              <div className="meta" style={{ marginTop: 8 }}>Останні 16 тижнів</div>
             </div>
+            <span className="meta" style={{ fontSize: 11, color: 'var(--text-3)' }}>рік →</span>
           </div>
 
           <div className="tracker-grid">
-            {weeks.map((week, weekIndex) => (
-              <div key={weekIndex} className="tracker-col">
-                {week.map((day, dayIndex) => {
+            {/* corner */}
+            <div />
+            {/* month labels */}
+            {weeks.map((week, wi) => (
+              <div key={`m${wi}`} className="tracker-month-lbl">
+                {wi === 0 || week[0].getMonth() !== weeks[wi - 1][0].getMonth()
+                  ? week[0].toLocaleDateString('uk-UA', { month: 'short' }).replace(/\./g, '')
+                  : null}
+              </div>
+            ))}
+            {/* day rows */}
+            {DAY_ORDER.map((dayIdx, rowIdx) => (
+              <Fragment key={dayIdx}>
+                <div className="tracker-day-lbl">
+                  {rowIdx % 2 === 0 ? DAY_LABEL[dayIdx] : null}
+                </div>
+                {weeks.map((week, wi) => {
+                  const day = week[dayIdx]
+                  if (!day) return <div key={wi} className="tracker-cell" style={{ opacity: 0, border: 'none' }} />
                   const color = workoutByDate[day.toDateString()]
                   return (
                     <div
-                      key={dayIndex}
+                      key={wi}
                       className="tracker-cell"
                       title={day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
                       style={{
@@ -226,7 +270,7 @@ export default function Progress() {
                     />
                   )
                 })}
-              </div>
+              </Fragment>
             ))}
           </div>
 
@@ -246,7 +290,7 @@ export default function Progress() {
           <div className="card-row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
             <div>
               <div className="h-3">Заміри тіла</div>
-              <div className="meta" style={{ marginTop: 2 }}>6 місяців</div>
+              <div className="meta" style={{ marginTop: 8 }}>6 місяців</div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="num" style={{ fontSize: 22, fontWeight: 700 }}>
@@ -373,7 +417,7 @@ export default function Progress() {
                         color: index === 0 ? 'var(--accent)' : 'var(--text-3)',
                       }}
                     >
-                      🏆
+                      <IconTrophy size={18} />
                     </div>
                     <div>
                       <div style={{ fontWeight: 600 }}>{record.name}</div>
@@ -393,6 +437,76 @@ export default function Progress() {
           </section>
         )}
       </div>
+      {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} />}
+
+      {trackerOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+          <div className="topbar">
+            <div style={{ width: 38 }} />
+            <div className="topbar-title">
+              <div className="label">Активність</div>
+              <div className="h-3">Рік тренувань</div>
+            </div>
+            <button type="button" className="icon-btn" onClick={() => setTrackerOpen(false)}>
+              <IconX size={18} />
+            </button>
+          </div>
+
+          <div ref={yearScrollRef} style={{ overflowX: 'auto', padding: '20px 24px', flex: 1, display: 'flex', alignItems: 'center' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `14px repeat(${yearWeeks.length}, minmax(11px, 1fr))`,
+              gap: '3px',
+              minWidth: '100%',
+              alignItems: 'center',
+            }}>
+              <div />
+              {yearWeeks.map((week, wi) => (
+                <div key={`m${wi}`} style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', whiteSpace: 'nowrap', paddingBottom: 2, alignSelf: 'end' }}>
+                  {wi === 0 || week[0].getMonth() !== yearWeeks[wi - 1][0].getMonth()
+                    ? week[0].toLocaleDateString('uk-UA', { month: 'short' }).replace(/\./g, '')
+                    : null}
+                </div>
+              ))}
+              {DAY_ORDER.map((dayIdx, rowIdx) => (
+                <Fragment key={dayIdx}>
+                  <div style={{ width: '100%', aspectRatio: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontSize: 9, color: 'var(--text-3)', lineHeight: 1 }}>
+                    {rowIdx % 2 === 0 ? DAY_LABEL[dayIdx] : null}
+                  </div>
+                  {yearWeeks.map((week, wi) => {
+                    const day = week[dayIdx]
+                    if (!day) return <div key={wi} style={{ width: '100%', aspectRatio: 1 }} />
+                    const color = workoutByDate[day.toDateString()]
+                    return (
+                      <div
+                        key={wi}
+                        title={day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                        style={{
+                          width: '100%', aspectRatio: 1, borderRadius: 3,
+                          border: color ? 'none' : '1px solid var(--border)',
+                          background: color ?? 'var(--surface-2)',
+                          boxShadow: color ? `0 0 6px ${color}66` : 'none',
+                        }}
+                      />
+                    )
+                  })}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding: '0 16px 24px', display: 'flex', gap: 16 }}>
+            <div className="tracker-legend-item">
+              <div className="tracker-legend-dot" style={{ background: 'var(--surface-2)' }} />
+              Немає
+            </div>
+            <div className="tracker-legend-item">
+              <div className="tracker-legend-dot" style={{ background: '#52525b' }} />
+              Тренування
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

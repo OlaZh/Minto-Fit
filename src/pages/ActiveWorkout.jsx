@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import {
+  IconArrowLeft, IconMore, IconX, IconCheck, IconFlame, IconDumbbell,
+  IconCamera, IconPlay, IconNote, IconRotate, IconTired, IconFlex, IconLeaf,
+} from '../components/Icons'
 
-const REST_SECONDS = 90
+function getLS(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v) } catch { return fallback }
+}
 
-  function fmtTime(seconds) {
+function fmtTime(seconds) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0')
   const s = (seconds % 60).toString().padStart(2, '0')
   return `${m}:${s}`
@@ -29,7 +35,7 @@ export default function ActiveWorkout() {
   const [rest, setRest] = useState(null)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
-  const [selectedMood, setSelectedMood] = useState('💪')
+  const [selectedMood, setSelectedMood] = useState('нормально')
   const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false })
   const [rpe, setRpe] = useState({})
   const [replacedExercises, setReplacedExercises] = useState({})
@@ -37,12 +43,21 @@ export default function ActiveWorkout() {
   const [menuExerciseId, setMenuExerciseId] = useState(null)
   const [menuSection, setMenuSection] = useState(null)
   const [editingCell, setEditingCell] = useState(null)
+  const [noteEdit, setNoteEdit] = useState(null)
 
   const wakeLockRef = useRef(null)
   const elapsedRef = useRef(null)
   const restRef = useRef(null)
+  const restTotalRef = useRef(getLS('mf_rest_seconds', 90))
+
+  const isPreview = !!window.history.state?.usr?.preview
 
   useEffect(() => {
+    if (!window.history.state?.usr?.fromApp) {
+      navigate('/')
+      return
+    }
+
     async function load() {
       const { data: user } = await supabase.auth.getUser()
       const uid = user.user.id
@@ -122,12 +137,28 @@ export default function ActiveWorkout() {
 
       setExercises(exList)
 
-      const { data: workout } = await supabase
-        .from('mf_workouts')
-        .insert({ user_id: uid, program_id: programId })
-        .select('id')
-        .single()
-      setWorkoutId(workout.id)
+      if (!isPreview) {
+        const { data: existingWorkout } = await supabase
+          .from('mf_workouts')
+          .select('id')
+          .eq('user_id', uid)
+          .eq('program_id', programId)
+          .is('finished_at', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        let workoutRow = existingWorkout
+        if (!workoutRow) {
+          const { data: newWorkout } = await supabase
+            .from('mf_workouts')
+            .insert({ user_id: uid, program_id: programId })
+            .select('id')
+            .single()
+          workoutRow = newWorkout
+        }
+        setWorkoutId(workoutRow.id)
+      }
 
       setLoading(false)
     }
@@ -136,6 +167,8 @@ export default function ActiveWorkout() {
   }, [programId])
 
   useEffect(() => {
+    if (!getLS('mf_wake_lock_enabled', true)) return
+
     const acquire = async () => {
       try {
         if ('wakeLock' in navigator) {
@@ -157,7 +190,7 @@ export default function ActiveWorkout() {
   }, [])
 
   useEffect(() => {
-    if (loading) return
+    if (loading || isPreview) return
     elapsedRef.current = setInterval(() => setElapsed(value => value + 1), 1000)
     return () => clearInterval(elapsedRef.current)
   }, [loading])
@@ -165,8 +198,8 @@ export default function ActiveWorkout() {
   useEffect(() => {
     if (rest === null) return
     if (rest === 0) {
-      playBeep()
-      if (navigator.vibrate) navigator.vibrate([300, 100, 300])
+      if (getLS('mf_sound_enabled', true)) playBeep()
+      if (getLS('mf_vibration_enabled', true) && navigator.vibrate) navigator.vibrate([300, 100, 300])
       setRest(null)
       return
     }
@@ -213,6 +246,23 @@ export default function ActiveWorkout() {
     updateSet(exIdx, setIdx, 'reps', Math.max(1, value + delta))
   }
 
+  function removeLastSet(exIdx) {
+    setExercises(prev => prev.map((exercise, i) => {
+      if (i !== exIdx || exercise.sets.length <= 1) return exercise
+      return { ...exercise, sets: exercise.sets.slice(0, -1) }
+    }))
+  }
+
+  async function saveNote(exerciseId, text) {
+    await supabase.from('mf_exercises').update({ personal_note: text }).eq('id', exerciseId)
+    setExercises(prev => prev.map(item =>
+      item.exercise.id === exerciseId
+        ? { ...item, exercise: { ...item.exercise, personal_note: text } }
+        : item
+    ))
+    setNoteEdit(null)
+  }
+
   function addSet(exIdx) {
     setExercises(prev => prev.map((exercise, i) => {
       if (i !== exIdx) return exercise
@@ -251,12 +301,15 @@ export default function ActiveWorkout() {
 
   async function completeSet(exIdx, setIdx) {
     updateSet(exIdx, setIdx, 'completed', true)
-    setRest(REST_SECONDS)
+    const restSecs = getLS('mf_rest_seconds', 90)
+    restTotalRef.current = restSecs
+    setRest(restSecs)
     if (!workoutId) return
 
     const set = exercises[exIdx].sets[setIdx]
     const displayExercise = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
 
+    if (isPreview) return
     supabase.from('mf_workout_sets').insert({
       workout_id: workoutId,
       exercise_id: displayExercise.id,
@@ -324,20 +377,19 @@ export default function ActiveWorkout() {
   if (summaryOpen) {
     return (
       <div className="screen screen--no-nav">
-        <div className="page page-top stack" style={{ gap: 24, justifyContent: 'space-between', minHeight: '100%' }}>
-          <div className="stack" style={{ gap: 24 }}>
+        <div className="page page-top stack" style={{ gap: 32, justifyContent: 'space-between', minHeight: '100%' }}>
+          <div className="stack" style={{ gap: 28 }}>
             <div className="card-row" style={{ alignItems: 'flex-start' }}>
               <div>
                 <div className="label">Тренування завершено</div>
               </div>
-              <button type="button" className="icon-btn" onClick={() => navigate('/')}>✕</button>
+              <button type="button" className="icon-btn" onClick={() => navigate('/')}><IconX size={18} /></button>
             </div>
 
-            <div className="summary-check">✓</div>
+            <div className="summary-check" style={{ marginTop: 8 }}><IconCheck size={56} /></div>
 
-            <div style={{ textAlign: 'center' }}>
-              <div className="h-1" style={{ marginBottom: 8 }}>Чудова робота!</div>
-              <div className="meta">{program?.name ?? 'Тренування'}</div>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div className="h-1">Чудова робота!</div>
             </div>
 
             <div className="summary-grid">
@@ -375,18 +427,18 @@ export default function ActiveWorkout() {
               <div className="label" style={{ textAlign: 'center' }}>Як відчувалось?</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
                 {[
-                  { key: 'важко', label: 'Важко', icon: '😤' },
-                  { key: 'нормально', label: 'Нормально', icon: '💪' },
-                  { key: 'легко', label: 'Легко', icon: '🌿' },
+                  { key: 'важко', label: 'Важко', Icon: IconTired },
+                  { key: 'нормально', label: 'Нормально', Icon: IconFlex },
+                  { key: 'легко', label: 'Легко', Icon: IconLeaf },
                 ].map(option => (
                   <button
                     key={option.key}
                     type="button"
                     className="emoji-choice"
-                    data-active={selectedMood === option.icon ? '1' : '0'}
-                    onClick={() => setSelectedMood(option.icon)}
+                    data-active={selectedMood === option.key ? '1' : '0'}
+                    onClick={() => setSelectedMood(option.key)}
                   >
-                    <span style={{ fontSize: 30 }}>{option.icon}</span>
+                    <option.Icon size={32} />
                     <span className="meta" style={{ fontSize: 12 }}>{option.label}</span>
                   </button>
                 ))}
@@ -398,12 +450,7 @@ export default function ActiveWorkout() {
             type="button"
             className="btn btn-primary btn-block"
             onClick={() => {
-              const intensityByMood = {
-                '😤': 'важко',
-                '💪': 'нормально',
-                '🌿': 'легко',
-              }
-              finishWorkout(intensityByMood[selectedMood] ?? 'нормально')
+              finishWorkout(selectedMood)
             }}
           >
             На головну
@@ -419,18 +466,19 @@ export default function ActiveWorkout() {
         <button
           type="button"
           onClick={() => {
+            if (isPreview) { navigate(-1); return }
             if (confirm('Скасувати тренування?')) navigate('/')
           }}
           className="icon-btn"
           aria-label="Назад"
         >
-          ←
+          <IconArrowLeft size={20} />
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
           <div className="label" style={{ textAlign: 'center' }}>
-            {formatProgramTitle(program?.name ?? 'Тренування')}
+            {isPreview ? 'ПЕРЕГЛЯД' : formatProgramTitle(program?.name ?? 'Тренування')}
           </div>
-          <div className="num" style={{ fontSize: 18, fontWeight: 700 }}>{fmtTime(elapsed)}</div>
+          {!isPreview && <div className="num" style={{ fontSize: 18, fontWeight: 700 }}>{fmtTime(elapsed)}</div>}
         </div>
         <button
           type="button"
@@ -438,24 +486,26 @@ export default function ActiveWorkout() {
           aria-label="Завершити або параметри"
           onClick={requestFinish}
         >
-          ⋯
+          <IconMore size={20} />
         </button>
       </div>
 
       <div className="page stack" style={{ paddingTop: 12, gap: 14 }}>
-        <section className="stack" style={{ gap: 10 }}>
-          <div className="progress-strip">
-            <div className="progress-strip-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="top-meta-bar">
-            <span>{completedSets} з {totalSets} підходів</span>
-            <span className="num">{progress}%</span>
-          </div>
-        </section>
+        {!isPreview && (
+          <section className="stack" style={{ gap: 10 }}>
+            <div className="progress-strip">
+              <div className="progress-strip-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="top-meta-bar">
+              <span>{completedSets} з {totalSets} підходів</span>
+              <span className="num">{progress}%</span>
+            </div>
+          </section>
+        )}
 
         <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-            <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}>🏃</div>
+            <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}><IconFlame size={20} /></div>
             <div style={{ flex: 1 }}>
               <div className="h-3" style={{ fontSize: 15 }}>Кардіо розминка</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
@@ -492,12 +542,12 @@ export default function ActiveWorkout() {
             }}
             aria-label="Завершити розминку"
           >
-            {cardio.done ? '✓' : ''}
+            {cardio.done ? <IconCheck size={18} /> : ''}
           </button>
         </div>
 
         {rest !== null && (
-          <div className="timer-bar" style={{ '--p': `${Math.max(0, 100 - (rest / REST_SECONDS) * 100)}%` }}>
+          <div className="timer-bar" style={{ '--p': `${Math.max(0, 100 - (rest / restTotalRef.current) * 100)}%` }}>
             <div>
               <div className="label" style={{ color: 'rgba(198,255,61,0.85)' }}>Відпочинок</div>
               <div className="num" style={{ fontSize: 24, fontWeight: 600, color: 'var(--accent)' }}>
@@ -530,7 +580,7 @@ export default function ActiveWorkout() {
                       {displayExercise.machine_photo_url ? (
                         <img src={displayExercise.machine_photo_url} alt={displayExercise.name} />
                       ) : (
-                        <span style={{ fontSize: 18 }}>🏋️</span>
+                        <IconDumbbell size={20} style={{ color: 'var(--text-3)' }} />
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -541,7 +591,7 @@ export default function ActiveWorkout() {
                       <div className="ex-note">{displayExercise.muscle_group ?? 'Тренажер'}</div>
                       {displayExercise.personal_note && (
                         <div className="ex-note" style={{ color: 'var(--text-4)' }}>
-                          💡 {displayExercise.personal_note}
+                          {displayExercise.personal_note}
                         </div>
                       )}
                     </div>
@@ -555,7 +605,7 @@ export default function ActiveWorkout() {
                       setMenuSection(null)
                     }}
                   >
-                    ⋯
+                    <IconMore size={18} />
                   </button>
                 </div>
 
@@ -665,7 +715,7 @@ export default function ActiveWorkout() {
                           data-done={set.completed ? '1' : '0'}
                           onClick={() => completeSet(exerciseIndex, setIndex)}
                         >
-                          {set.completed ? '✓' : ''}
+                          {set.completed ? <IconCheck size={16} /> : ''}
                         </button>
                       </div>
                     )
@@ -676,13 +726,32 @@ export default function ActiveWorkout() {
                   <button
                     type="button"
                     className="ex-action-btn"
-                    onClick={() => {
-                      setMenuExerciseId(exercise.exercise.id)
-                      setMenuSection('description')
-                    }}
+                    onClick={() => setNoteEdit({ exerciseId: displayExercise.id, text: displayExercise.personal_note ?? '' })}
                   >
-                    🗒️ Нотатки
+                    <IconNote size={15} /> Нотатки
+                    {!!displayExercise.personal_note && (
+                      <span style={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: 'var(--accent)', flexShrink: 0,
+                      }} />
+                    )}
                   </button>
+                  <button
+                    type="button"
+                    className="ex-action-btn"
+                    onClick={() => addSet(exerciseIndex)}
+                  >
+                    + Підхід
+                  </button>
+                  {exercise.sets.length > 1 && (
+                    <button
+                      type="button"
+                      className="ex-action-btn"
+                      onClick={() => removeLastSet(exerciseIndex)}
+                    >
+                      − Підхід
+                    </button>
+                  )}
                   {exercise.alternatives.length > 0 && (
                     <button
                       type="button"
@@ -723,7 +792,7 @@ export default function ActiveWorkout() {
                         }
                       }}
                     >
-                      ⇄ {isReplaced ? 'Повернути' : 'Замінити'}
+                      <IconRotate size={15} /> {isReplaced ? 'Повернути' : 'Замінити'}
                     </button>
                   )}
                 </div>
@@ -734,14 +803,20 @@ export default function ActiveWorkout() {
       </div>
 
       <div className="finish-bar">
-        <button
-          type="button"
-          className="btn btn-primary btn-block"
-          onClick={requestFinish}
-          style={{ opacity: 1 }}
-        >
-          Завершити тренування
-        </button>
+        {isPreview ? (
+          <button type="button" className="btn btn-ghost btn-block" onClick={() => navigate(-1)}>
+            Закрити перегляд
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={requestFinish}
+            style={{ opacity: 1 }}
+          >
+            Завершити тренування
+          </button>
+        )}
       </div>
 
       {menuExercise && (
@@ -759,7 +834,7 @@ export default function ActiveWorkout() {
                 className="prog-select-card"
                 onClick={() => setMenuSection(menuSection === 'photo' ? null : 'photo')}
               >
-                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}>📷</div>
+                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}><IconCamera size={20} /></div>
                 <div>
                   <div style={{ fontWeight: 600 }}>Фото тренажера</div>
                   <div className="meta">{menuDisplayExercise?.machine_photo_url ? 'Показати фото' : 'Фото ще не додано'}</div>
@@ -775,7 +850,7 @@ export default function ActiveWorkout() {
                   }
                 }}
               >
-                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}>▶️</div>
+                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}><IconPlay size={20} /></div>
                 <div>
                   <div style={{ fontWeight: 600 }}>Відео техніки</div>
                   <div className="meta">{menuDisplayExercise?.youtube_url ? 'Відкрити YouTube' : 'Відео ще не додано'}</div>
@@ -787,7 +862,7 @@ export default function ActiveWorkout() {
                 className="prog-select-card"
                 onClick={() => setMenuSection(menuSection === 'description' ? null : 'description')}
               >
-                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}>📝</div>
+                <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}><IconNote size={20} /></div>
                 <div>
                   <div style={{ fontWeight: 600 }}>Техніка виконання</div>
                   <div className="meta">
@@ -867,6 +942,33 @@ export default function ActiveWorkout() {
                   }}
                 >
                   Завершити
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {noteEdit && (
+        <div className="sheet-backdrop" onClick={() => setNoteEdit(null)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="stack">
+              <div className="h-3">Мої нотатки</div>
+              <textarea
+                value={noteEdit.text}
+                onChange={e => setNoteEdit(prev => ({ ...prev, text: e.target.value }))}
+                placeholder="Висота сидіння, позиція валиків..."
+                rows={4}
+                className="textarea-field"
+                autoFocus
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button type="button" className="btn btn-ghost btn-block" onClick={() => setNoteEdit(null)}>
+                  Скасувати
+                </button>
+                <button type="button" className="btn btn-primary btn-block" onClick={() => saveNote(noteEdit.exerciseId, noteEdit.text)}>
+                  Зберегти
                 </button>
               </div>
             </div>

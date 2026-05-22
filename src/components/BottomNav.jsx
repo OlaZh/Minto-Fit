@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
+import { IconDumbbell, IconChart, IconLayers } from './Icons'
 
 const tabs = [
-  { to: '/', label: 'Тренування', icon: '🏋️' },
-  { to: '/progress', label: 'Прогрес', icon: '📊' },
-  { to: '/programs', label: 'Програми', icon: '🗂️' },
+  { to: '/', label: 'Тренування', Icon: IconDumbbell },
+  { to: '/progress', label: 'Прогрес', Icon: IconChart },
+  { to: '/programs', label: 'Програми', Icon: IconLayers },
 ]
 
 export default function BottomNav() {
@@ -17,7 +18,7 @@ export default function BottomNav() {
             end={tab.to === '/'}
             className={({ isActive }) => `nav-btn${isActive ? ' nav-btn--active' : ''}`}
           >
-            <span aria-hidden="true">{tab.icon}</span>
+            <tab.Icon />
             <span className="nav-label">{tab.label}</span>
           </NavLink>
         ))}

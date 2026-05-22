@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { IconArrowLeft, IconPlay, IconNote, getProgramIcon } from '../components/Icons'
+
+function ProgramIcon({ program }) {
+  const PIcon = getProgramIcon(program)
+  return (
+    <div className="prog-icon" style={{ background: `${program.color ?? '#3f3f46'}18` }}>
+      <PIcon size={20} style={{ color: program.color ?? 'var(--text-3)' }} />
+    </div>
+  )
+}
 
 export default function ProgramDetail() {
   const { id } = useParams()
@@ -59,7 +69,7 @@ export default function ProgramDetail() {
   return (
     <div className="screen screen--no-nav">
       <div className="topbar">
-        <button type="button" className="icon-btn" onClick={() => navigate('/programs')}>←</button>
+        <button type="button" className="icon-btn" onClick={() => navigate('/programs')}><IconArrowLeft size={20} /></button>
         <div className="topbar-title" style={{ alignItems: 'center', textAlign: 'center', flex: 1 }}>
           <div className="label">Програма</div>
           <div className="h-3">{program.name}</div>
@@ -71,12 +81,7 @@ export default function ProgramDetail() {
         <div className="card" style={{ padding: 18 }}>
           <div className="card-row" style={{ alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div
-                className="prog-icon"
-                style={{ background: `${program.color ?? '#3f3f46'}18` }}
-              >
-                <span>{program.emoji ?? '💪'}</span>
-              </div>
+              <ProgramIcon program={program} />
               <div>
                 <div className="h-3">{program.name.replace(/\s+—.+$/, '')}</div>
                 <div className="meta" style={{ marginTop: 2 }}>
@@ -109,13 +114,17 @@ export default function ProgramDetail() {
                 <div style={{ flex: 1 }}>
                   <div className="h-3">{exercise.name}</div>
                   <div className="meta" style={{ marginTop: 4 }}>
-                    {default_sets} підходи · {default_reps} повторень · {default_weight} кг
+                    {[
+                      default_sets   ? `${default_sets} підх.`  : null,
+                      default_reps   ? `${default_reps} повт.`  : null,
+                      default_weight ? `${default_weight} кг`   : null,
+                    ].filter(Boolean).join(' · ') || 'Вільна форма'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {exercise.youtube_url && (
                     <a href={exercise.youtube_url} target="_blank" rel="noreferrer" className="icon-btn">
-                      ▶️
+                        <IconPlay size={18} />
                     </a>
                   )}
                   <button
@@ -126,11 +135,17 @@ export default function ProgramDetail() {
                       setNoteText(exercise.personal_note ?? '')
                     }}
                   >
-                    📝
+                      <IconNote size={18} />
                   </button>
                 </div>
               </div>
 
+              {exercise.description && (
+                <div className="card" style={{ background: 'var(--surface-2)', padding: 14 }}>
+                  <div className="label" style={{ marginBottom: 6 }}>Опис</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-2)' }}>{exercise.description}</div>
+                </div>
+              )}
               {exercise.personal_note && (
                 <div className="card" style={{ background: 'var(--surface-2)', padding: 14 }}>
                   <div className="label" style={{ marginBottom: 6 }}>Мої налаштування</div>
@@ -140,6 +155,23 @@ export default function ProgramDetail() {
             </div>
           </article>
         ))}
+      </div>
+
+      <div className="finish-bar" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-block"
+          onClick={() => navigate(`/programs/${id}/edit`)}
+        >
+          Редагувати
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          onClick={() => navigate(`/workout/${id}`, { state: { fromApp: true, preview: true } })}
+        >
+          Переглянути
+        </button>
       </div>
 
       {noteOpen && (

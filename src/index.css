@@ -136,7 +136,7 @@
 }
 
 .topbar {
-  padding: max(env(safe-area-inset-top), 20px) 20px 8px;
+  padding: max(env(safe-area-inset-top), 20px) 20px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -222,7 +222,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 18px;
+  padding: 20px;
 }
 
 .card-row {
@@ -789,7 +789,7 @@
 }
 
 .sheet-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
@@ -844,7 +844,7 @@
 }
 
 .modal-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.72);
   display: flex;
@@ -879,7 +879,7 @@
   display: grid;
   place-items: center;
   margin: 0 auto;
-  box-shadow: 0 16px 40px -10px rgba(198, 255, 61, 0.5);
+  box-shadow: 0 0 40px 0px rgba(198, 255, 61, 0.35);
   font-size: 52px;
   font-weight: 700;
 }
@@ -987,31 +987,46 @@
 }
 
 .tracker-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px repeat(16, 1fr);
   gap: 3px;
-  overflow-x: auto;
+  width: 100%;
+  align-items: center;
 }
 
-.tracker-col {
+.tracker-month-lbl {
+  font-size: 9px;
+  color: var(--text-3);
+  overflow: hidden;
+  white-space: nowrap;
+  padding-bottom: 2px;
+  align-self: end;
+}
+
+.tracker-day-lbl {
+  aspect-ratio: 1;
+  width: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-3);
 }
 
 .tracker-cell {
-  width: 16px;
-  height: 16px;
+  aspect-ratio: 1;
+  width: 100%;
   border-radius: 3px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  flex-shrink: 0;
 }
 
 .tracker-legend {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 10px;
+  margin-top: 16px;
 }
 
 .tracker-legend-item {
