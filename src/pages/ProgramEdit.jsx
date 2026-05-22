@@ -4,10 +4,6 @@ import { supabase } from '../lib/supabase'
 import { IconArrowLeft, IconPlus, IconX, IconCheck, getProgramIcon } from '../components/Icons'
 
 const COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899']
-const TYPES = [
-  { value: 'основна', label: 'Основна' },
-  { value: 'додаткова', label: 'Додаткова' },
-]
 
 const NUM_FIELDS = [
   { key: 'sets',   label: 'Підходи',    placeholder: '—' },
@@ -29,6 +25,7 @@ export default function ProgramEdit() {
   const [name, setName] = useState('')
   const [type, setType] = useState('основна')
   const [color, setColor] = useState('#3b82f6')
+  const [existingGroups, setExistingGroups] = useState([])
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -38,11 +35,18 @@ export default function ProgramEdit() {
   const [creatingNew, setCreatingNew] = useState(false)
 
   useEffect(() => {
+    supabase.from('mf_programs').select('type').then(({ data }) => {
+      const unique = [...new Set((data ?? []).map(p => p.type).filter(Boolean))]
+      setExistingGroups(unique)
+    })
+  }, [])
+
+  useEffect(() => {
     if (!isNew) {
       Promise.all([
         supabase.from('mf_programs').select('*').eq('id', id).single(),
         supabase.from('mf_program_exercises')
-          .select('*, exercise:mf_exercises(id,name,description)')
+          .select('*, exercise:mf_exercises(id,name,description,machine_photo_url)')
           .eq('program_id', id)
           .order('order'),
       ]).then(([{ data: prog }, { data: exs }]) => {
@@ -59,6 +63,7 @@ export default function ProgramEdit() {
           weight:   e.default_weight != null ? String(e.default_weight) : '',
           duration: '',
           description: e.exercise.description ?? '',
+          photo_url: e.exercise.machine_photo_url ?? '',
         })))
         setLoading(false)
       })
@@ -81,6 +86,7 @@ export default function ProgramEdit() {
         name: ex.name,
         sets: '', reps: '', weight: '', duration: '',
         description: ex.description ?? '',
+        photo_url: ex.machine_photo_url ?? '',
       }])
     }
     setPickerOpen(false)
@@ -127,9 +133,14 @@ export default function ProgramEdit() {
       return row
     }
 
-    const descUpdates = exercises
-      .filter(e => e.description.trim())
-      .map(e => supabase.from('mf_exercises').update({ description: e.description.trim() }).eq('id', e.exercise_id))
+    const descUpdates = exercises.map(e => {
+      const patch = {}
+      if (e.description.trim()) patch.description = e.description.trim()
+      if (e.photo_url.trim()) patch.machine_photo_url = e.photo_url.trim()
+      return Object.keys(patch).length
+        ? supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
+        : null
+    }).filter(Boolean)
 
     if (isNew) {
       const { data: prog } = await supabase
@@ -186,7 +197,7 @@ export default function ProgramEdit() {
         <div style={{ width: 38 }} />
       </div>
 
-      <div className="page stack" style={{ paddingTop: 8, gap: 14 }}>
+      <div className="page stack">
 
         <div className="card" style={{ padding: 18 }}>
           <div className="stack" style={{ gap: 14 }}>
@@ -203,20 +214,35 @@ export default function ProgramEdit() {
             </div>
 
             <div className="stack" style={{ gap: 6 }}>
-              <div className="label">Тип</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {TYPES.map(t => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    className="pill-btn"
-                    data-active={type === t.value ? '1' : '0'}
-                    onClick={() => setType(t.value)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              <div className="label">Група</div>
+              <input
+                type="text"
+                value={type}
+                onChange={e => setType(e.target.value)}
+                placeholder="Наприклад: основна, легка, мікс..."
+                className="field"
+                style={{ width: '100%' }}
+                list="group-suggestions"
+              />
+              <datalist id="group-suggestions">
+                {existingGroups.map(g => <option key={g} value={g} />)}
+              </datalist>
+              {existingGroups.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {existingGroups.map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      className="pill-btn"
+                      data-active={type === g ? '1' : '0'}
+                      onClick={() => setType(g)}
+                      style={{ fontSize: 12 }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="stack" style={{ gap: 6 }}>
@@ -283,6 +309,26 @@ export default function ProgramEdit() {
                     />
                   </div>
                 ))}
+              </div>
+
+              <div className="stack" style={{ gap: 4 }}>
+                <div className="meta" style={{ fontSize: 11 }}>Фото тренажера (URL)</div>
+                <input
+                  type="url"
+                  value={ex.photo_url}
+                  onChange={e => updateField(idx, 'photo_url', e.target.value)}
+                  placeholder="https://..."
+                  className="field"
+                  style={{ width: '100%', fontSize: 13 }}
+                />
+                {ex.photo_url.trim() && (
+                  <img
+                    src={ex.photo_url.trim()}
+                    alt="preview"
+                    style={{ width: '100%', aspectRatio: '16/7', objectFit: 'cover', borderRadius: 10, marginTop: 4 }}
+                    onError={e => { e.currentTarget.style.display = 'none' }}
+                  />
+                )}
               </div>
 
               <div className="stack" style={{ gap: 4 }}>

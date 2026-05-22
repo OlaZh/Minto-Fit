@@ -490,7 +490,7 @@ export default function ActiveWorkout() {
         </button>
       </div>
 
-      <div className="page stack" style={{ paddingTop: 12, gap: 14 }}>
+      <div className="page stack">
         {!isPreview && (
           <section className="stack" style={{ gap: 10 }}>
             <div className="progress-strip">

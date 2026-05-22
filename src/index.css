@@ -16,9 +16,9 @@
     --text-2: #9a9aa3;
     --text-3: #5a5a62;
     --text-4: #3a3a40;
-    --accent: #c6ff3d;
-    --accent-2: #9fe800;
-    --accent-text: #0a0a0b;
+    --accent: #8cc4a6;
+    --accent-2: #6aad8e;
+    --accent-text: #0a0f0c;
     --success: #4ade80;
     --warning: #ffb547;
     --danger: #ff5a5f;
@@ -42,7 +42,7 @@
   html, body {
     margin: 0;
     background:
-      radial-gradient(1200px 600px at 50% -200px, rgba(198, 255, 61, 0.04), transparent 60%),
+      radial-gradient(1200px 600px at 50% -200px, rgba(140, 196, 166, 0.04), transparent 60%),
       var(--bg);
     color: var(--text);
     font-family: var(--font-ui);
@@ -246,6 +246,11 @@
   gap: 14px;
 }
 
+.page.stack {
+  gap: 14px;
+  padding-top: 26px;
+}
+
 .prog-divider {
   height: 1px;
   background: var(--border);
@@ -389,7 +394,7 @@
 .btn-primary {
   background: var(--accent);
   color: var(--accent-text);
-  box-shadow: 0 8px 20px -8px rgba(198, 255, 61, 0.5);
+  box-shadow: 0 8px 20px -8px rgba(140, 196, 166, 0.5);
 }
 
 .btn-primary:hover {
@@ -441,8 +446,9 @@
 }
 
 .pill-btn[data-active='1'] {
-  background: var(--text);
-  color: #111214;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
 }
 
 .pill-btn[data-state='done'] {
@@ -472,9 +478,9 @@
 .timer-bar {
   margin: 0;
   padding: 14px 18px;
-  border: 1px solid rgba(198, 255, 61, 0.3);
+  border: 1px solid rgba(140, 196, 166, 0.3);
   border-radius: var(--r-lg);
-  background: linear-gradient(135deg, rgba(198, 255, 61, 0.18), rgba(198, 255, 61, 0.06));
+  background: linear-gradient(135deg, rgba(140, 196, 166, 0.18), rgba(140, 196, 166, 0.06));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -488,7 +494,7 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--p, 0%);
-  background: rgba(198, 255, 61, 0.08);
+  background: rgba(140, 196, 166, 0.08);
   transition: width 1s linear;
 }
 
@@ -879,7 +885,7 @@
   display: grid;
   place-items: center;
   margin: 0 auto;
-  box-shadow: 0 0 40px 0px rgba(198, 255, 61, 0.35);
+  box-shadow: 0 0 40px 0px rgba(140, 196, 166, 0.35);
   font-size: 52px;
   font-weight: 700;
 }

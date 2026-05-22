@@ -4,18 +4,49 @@ import { supabase } from '../lib/supabase'
 import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconChevronRight, IconPlus, getProgramIcon } from '../components/Icons'
 
-function splitPrograms(programs) {
-  return {
-    main: programs.filter(program => program.type === 'основна'),
-    light: programs.filter(program => program.type === 'додаткова' && program.name?.toLowerCase().startsWith('легке')),
-    mix: programs.filter(program => program.type === 'додаткова' && program.name?.toLowerCase().startsWith('мікс')),
+function resolveGroup(program) {
+  const t = program.type ?? 'інше'
+  // backwards-compat: split legacy 'додаткова' by name prefix
+  if (t === 'додаткова') {
+    const n = program.name?.toLowerCase() ?? ''
+    if (n.startsWith('легке') || n.startsWith('легк')) return 'легка'
+    if (n.startsWith('мікс')) return 'мікс'
+    return 'додаткова'
   }
+  return t
+}
+
+function groupPrograms(programs) {
+  const ORDER = ['основна', 'легка', 'мікс', 'додаткова']
+  const map = {}
+  programs.forEach(p => {
+    const key = resolveGroup(p)
+    if (!map[key]) map[key] = []
+    map[key].push(p)
+  })
+  const sorted = {}
+  ;[...ORDER, ...Object.keys(map).filter(k => !ORDER.includes(k))]
+    .filter(k => map[k])
+    .forEach(k => { sorted[k] = map[k] })
+  return sorted
+}
+
+const GROUP_META = {
+  'основна':   { label: 'Основні',    color: '#3b82f6' },
+  'легка':     { label: 'Легкі',      color: '#22c55e' },
+  'мікс':      { label: 'Міксові',    color: '#f97316' },
+  'додаткова': { label: 'Додаткові',  color: '#8b5cf6' },
+}
+
+function groupMeta(key) {
+  return GROUP_META[key] ?? { label: key, color: '#3b82f6' }
 }
 
 export default function Programs() {
   const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(new Set())
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -23,13 +54,20 @@ export default function Programs() {
       .from('mf_programs')
       .select('*')
       .order('type')
+      .order('name')
       .then(({ data }) => {
         setPrograms(data ?? [])
         setLoading(false)
       })
   }, [])
 
-  const { main, light, mix } = splitPrograms(programs)
+  function toggleGroup(key) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   if (loading) {
     return (
@@ -39,6 +77,9 @@ export default function Programs() {
     )
   }
 
+  const groups = groupPrograms(programs)
+  const groupKeys = Object.keys(groups)
+
   return (
     <div className="screen">
       <div className="topbar">
@@ -47,20 +88,61 @@ export default function Programs() {
           <div className="h-1">Програми</div>
         </div>
         <div className="topbar-actions">
-          <button type="button" className="icon-btn" aria-label="Профіль" onClick={() => setProfileOpen(true)}><IconUser size={20} /></button>
+          <button type="button" className="icon-btn" aria-label="Профіль" onClick={() => setProfileOpen(true)}>
+            <IconUser size={20} />
+          </button>
         </div>
       </div>
 
-      <div className="page stack" style={{ paddingTop: 20, gap: 24 }}>
-        {main.length > 0 && (
-          <ProgramSection title="Основні — 4 дні на тиждень" programs={main} onOpen={navigate} />
-        )}
-        {light.length > 0 && (
-          <ProgramSection title="Легкі" programs={light} onOpen={navigate} />
-        )}
-        {mix.length > 0 && (
-          <ProgramSection title="Міксові" programs={mix} onOpen={navigate} />
-        )}
+      <div className="page stack">
+        {groupKeys.map(key => {
+          const isCollapsed = collapsed.has(key)
+          const list = groups[key]
+          const { label, color } = groupMeta(key)
+          return (
+            <section key={key} className="stack" style={{ gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(key)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: `radial-gradient(120% 100% at 100% 0%, ${color}22, transparent 65%), var(--surface)`,
+                  border: `1px solid ${color}45`,
+                  borderRadius: 16,
+                  cursor: 'pointer',
+                  padding: '14px 18px',
+                  width: '100%',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
+                    {label}
+                  </span>
+                  <span style={{
+                    fontSize: 12, fontWeight: 600,
+                    background: `${color}22`,
+                    border: `1px solid ${color}40`,
+                    borderRadius: 20,
+                    padding: '2px 8px',
+                    color,
+                  }}>
+                    {list.length}
+                  </span>
+                </div>
+                <span style={{
+                  color, fontSize: 16,
+                  transform: isCollapsed ? 'rotate(-90deg)' : 'none',
+                  transition: 'transform 0.2s',
+                  display: 'inline-block',
+                }}>∨</span>
+              </button>
+
+              {!isCollapsed && list.map(program => (
+                <ProgramRow key={program.id} program={program} onOpen={navigate} />
+              ))}
+            </section>
+          )
+        })}
 
         <button
           type="button"
@@ -81,21 +163,9 @@ export default function Programs() {
           </div>
         </button>
       </div>
+
       {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} />}
     </div>
-  )
-}
-
-function ProgramSection({ title, programs, onOpen }) {
-  return (
-    <section className="stack" style={{ gap: 10 }}>
-      <div className="section-head" style={{ marginBottom: 0 }}>
-        <div className="label">{title}</div>
-      </div>
-      {programs.map(program => (
-        <ProgramRow key={program.id} program={program} onOpen={onOpen} />
-      ))}
-    </section>
   )
 }
 

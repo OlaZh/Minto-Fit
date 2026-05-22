@@ -109,13 +109,14 @@ export default function Workout() {
   }
 
   async function loadProgStats(programId) {
-    const { data: exs } = await supabase
-      .from('mf_program_exercises')
-      .select('default_sets')
-      .eq('program_id', programId)
+    const [{ data: exs }, { data: lastWo }] = await Promise.all([
+      supabase.from('mf_program_exercises').select('default_sets').eq('program_id', programId),
+      supabase.from('mf_workouts').select('duration_minutes').eq('program_id', programId).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
     const exercises = exs?.length ?? 0
     const sets = (exs ?? []).reduce((s, e) => s + (e.default_sets ?? 3), 0)
-    setProgStats({ exercises, sets, est: sets * 3 })
+    const est = lastWo?.duration_minutes ?? sets * 3
+    setProgStats({ exercises, sets, est })
   }
 
   async function selectProgram(prog) {
@@ -149,7 +150,7 @@ export default function Workout() {
         </div>
       </div>
 
-      <div className="page stack" style={{ paddingTop: 16, gap: 12 }}>
+      <div className="page stack">
 
         {/* ── BLOCK 1: next workout ── */}
         {nextProgram ? (
@@ -235,7 +236,12 @@ export default function Workout() {
         {/* ── BLOCK 2: stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
           <StatCard value={stats.count}  unit="тренувань"  label="ВСЬОГО"  color="#3b82f6" />
-          <StatCard value={stats.hours}  unit="годин"      label="ЧАС"     color="#8b5cf6" />
+          <StatCard
+            value={stats.hours >= 1 ? stats.hours : Math.round(stats.hours * 60)}
+            unit={stats.hours >= 1 ? 'годин' : 'хвилин'}
+            label="ЧАС"
+            color="#8b5cf6"
+          />
           <StatCard value={stats.streak} unit="днів"       label="СЕРІЯ"   color="#22c55e" />
         </div>
 

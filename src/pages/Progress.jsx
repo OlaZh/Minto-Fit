@@ -208,26 +208,34 @@ export default function Progress() {
         </div>
       </div>
 
-      <div className="page stack" style={{ paddingTop: 20, gap: 24 }}>
+      <div className="page stack">
         <section className="stats">
-          <div className="stat">
+          <div className="stat" style={{ background: 'radial-gradient(110% 100% at 100% 0%, #3b82f61c, transparent), var(--surface)', borderColor: '#3b82f635' }}>
             <div className="stat-label">Тренувань</div>
             <div className="stat-value num">{thisMonth}</div>
-            <div className="stat-sub">цього місяця</div>
+            <div className="stat-sub" style={{ color: '#3b82f6' }}>цього місяця</div>
           </div>
-          <div className="stat">
+          <div className="stat" style={{ background: 'radial-gradient(110% 100% at 100% 0%, #8b5cf61c, transparent), var(--surface)', borderColor: '#8b5cf635' }}>
             <div className="stat-label">Streak</div>
             <div className="stat-value num">{streakWeeks}</div>
-            <div className="stat-sub">тижні поспіль</div>
+            <div className="stat-sub" style={{ color: '#8b5cf6' }}>тижні поспіль</div>
           </div>
-          <div className="stat">
+          <div className="stat" style={{ background: 'radial-gradient(110% 100% at 100% 0%, #8cc4a61c, transparent), var(--surface)', borderColor: '#8cc4a635' }}>
             <div className="stat-label">Цього тижня</div>
             <div className="stat-value num" style={{ color: 'var(--accent)' }}>{thisWeek}</div>
-            <div className="stat-sub">тренувань</div>
+            <div className="stat-sub" style={{ color: 'var(--accent)' }}>тренувань</div>
           </div>
         </section>
 
-        <section className="card" style={{ cursor: 'pointer' }} onClick={() => setTrackerOpen(true)}>
+        <section
+          className="card"
+          style={{
+            cursor: 'pointer',
+            background: 'radial-gradient(80% 100% at 100% 0%, #3b82f618, transparent), var(--surface)',
+            borderColor: '#3b82f640',
+          }}
+          onClick={() => setTrackerOpen(true)}
+        >
           <div className="card-row" style={{ marginBottom: 20 }}>
             <div>
               <div className="h-3">Відвідування</div>
@@ -286,7 +294,13 @@ export default function Progress() {
           </div>
         </section>
 
-        <section className="card line-chart-card">
+        <section
+          className="card line-chart-card"
+          style={{
+            background: 'radial-gradient(80% 100% at 100% 0%, #ec489918, transparent), var(--surface)',
+            borderColor: '#ec489935',
+          }}
+        >
           <div className="card-row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
             <div>
               <div className="h-3">Заміри тіла</div>

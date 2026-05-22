@@ -112,7 +112,7 @@ export default function BodyStats() {
         <div style={{ width: 38 }} />
       </div>
 
-      <div className="page stack" style={{ paddingTop: 8, gap: 18 }}>
+      <div className="page stack">
         {chartData.length > 1 && (
           <section className="card line-chart-card">
             <div className="pill-row" style={{ marginBottom: 14 }}>
