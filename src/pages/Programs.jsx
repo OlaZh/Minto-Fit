@@ -56,7 +56,9 @@ export default function Programs() {
       .order('type')
       .order('name')
       .then(({ data }) => {
-        setPrograms(data ?? [])
+        const list = data ?? []
+        setPrograms(list)
+        setCollapsed(new Set(Object.keys(groupPrograms(list))))
         setLoading(false)
       })
   }, [])
@@ -131,7 +133,7 @@ export default function Programs() {
                 </div>
                 <span style={{
                   color, fontSize: 16,
-                  transform: isCollapsed ? 'rotate(-90deg)' : 'none',
+                  transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
                   transition: 'transform 0.2s',
                   display: 'inline-block',
                 }}>∨</span>
