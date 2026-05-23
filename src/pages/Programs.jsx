@@ -185,15 +185,14 @@ function ProgramRow({ program, onOpen }) {
       }}
     >
       <div className="card-row">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <PIcon size={20} style={{ color: program.color ?? 'var(--text-3)', flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
+          <PIcon size={20} style={{ color: program.color ?? 'var(--text-3)', flexShrink: 0, marginTop: 3 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div className="h-2">{trimProgramName(program.name)}</div>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: program.color ?? '#71717a', flexShrink: 0 }} />
+            <div className="meta" style={{ marginTop: 3 }}>{extractProgramDescription(program.name)}</div>
           </div>
-          <div className="meta" style={{ marginTop: 4 }}>{extractProgramDescription(program.name)}</div>
         </div>
-        <span className="icon-btn" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="icon-btn" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <IconChevronRight size={18} />
         </span>
       </div>
