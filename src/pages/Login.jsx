@@ -16,10 +16,10 @@ export default function Login() {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="stack" style={{ gap: 24 }}>
-          <div>
+          <div className="stack" style={{ gap: 8 }}>
             <div className="label">MintoFit</div>
-            <div className="h-1" style={{ marginTop: 8 }}>Вхід у застосунок</div>
-            <div className="meta" style={{ marginTop: 8 }}>
+            <div className="h-1">Вхід у застосунок</div>
+            <div className="meta">
               Увійди через Google — застосунок тебе запам'ятає.
             </div>
           </div>

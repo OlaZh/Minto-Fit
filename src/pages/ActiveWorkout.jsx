@@ -838,7 +838,7 @@ export default function ActiveWorkout() {
               >
                 <div className="prog-icon" style={{ background: 'rgba(255,255,255,0.04)' }}><IconCamera size={20} /></div>
                 <div>
-                  <div style={{ fontWeight: 600 }}>Фото тренажера</div>
+                  <div style={{ fontWeight: 600 }}>Фото</div>
                   <div className="meta">{menuDisplayExercise?.machine_photo_url ? 'Показати фото' : 'Фото ще не додано'}</div>
                 </div>
               </button>
@@ -881,7 +881,7 @@ export default function ActiveWorkout() {
                     {menuDisplayExercise?.machine_photo_url ? (
                       <img src={menuDisplayExercise.machine_photo_url} alt={menuDisplayExercise.name} />
                     ) : (
-                      <span>Фото тренажера</span>
+                      <span>Фото</span>
                     )}
                   </div>
                 </div>

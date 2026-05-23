@@ -194,7 +194,7 @@ export default function ProgramDetail() {
                 {exercise.machine_photo_url ? (
                   <img src={exercise.machine_photo_url} alt={exercise.name} />
                 ) : (
-                  <span>Фото тренажера</span>
+                  <span>Фото</span>
                 )}
               </div>
 

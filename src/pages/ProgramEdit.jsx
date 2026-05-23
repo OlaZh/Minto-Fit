@@ -313,7 +313,7 @@ export default function ProgramEdit() {
               </div>
 
               <div className="stack" style={{ gap: 4 }}>
-                <div className="meta" style={{ fontSize: 11 }}>Фото тренажера (URL)</div>
+                <div className="meta" style={{ fontSize: 11 }}>Фото (URL)</div>
                 <input
                   type="url"
                   value={ex.photo_url}

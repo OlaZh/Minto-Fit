@@ -13,10 +13,9 @@
       <path d="M 232 0 H 792 C 920.06 0, 1024 103.94, 1024 232 V 792 C 1024 920.06, 920.06 1024, 792 1024 H 232 C 103.94 1024, 0 920.06, 0 792 V 232 C 0 103.94, 103.94 0, 232 0 Z"></path>
     </clipPath>
   </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"></rect>
+  <rect width="1024" height="1024" fill="url(#glow)"></rect>
   <g clip-path="url(#sq)">
-    
-    <rect width="1024" height="1024" fill="url(#bg)"></rect>
-    <rect width="1024" height="1024" fill="url(#glow)"></rect>
 
     
     <circle cx="512" cy="512" r="320" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="80"></circle>
