@@ -461,7 +461,8 @@ export default function ActiveWorkout() {
   }
 
   return (
-    <div className="screen screen--no-nav">
+    <div className="screen screen--no-nav" style={{ overflow: 'hidden', paddingBottom: 0 }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
       <div className="topbar" style={{ paddingBottom: 0 }}>
         <button
           type="button"
@@ -800,6 +801,7 @@ export default function ActiveWorkout() {
             )
           })}
         </div>
+      </div>
       </div>
 
       <div className="finish-bar">

@@ -2,53 +2,43 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function handleGoogle() {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
     })
-    setLoading(false)
-    if (!error) setSent(true)
   }
 
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div className="stack" style={{ gap: 20 }}>
+        <div className="stack" style={{ gap: 24 }}>
           <div>
             <div className="label">MintoFit</div>
-            <div className="h-1" style={{ marginTop: 8 }}>
-              {sent ? 'Перевір пошту' : 'Вхід у застосунок'}
-            </div>
+            <div className="h-1" style={{ marginTop: 8 }}>Вхід у застосунок</div>
             <div className="meta" style={{ marginTop: 8 }}>
-              {sent
-                ? <>Надіслали посилання на <span style={{ color: 'var(--text)' }}>{email}</span></>
-                : 'Увійди через email, щоб синхронізувати тренування та прогрес.'}
+              Увійди через Google — застосунок тебе запам'ятає.
             </div>
           </div>
 
-          {!sent && (
-            <form onSubmit={handleSubmit} className="stack">
-              <input
-                type="email"
-                required
-                placeholder="твій email"
-                value={email}
-                onChange={event => setEmail(event.target.value)}
-                className="field"
-                style={{ minHeight: 52 }}
-              />
-              <button type="submit" disabled={loading} className="btn btn-primary btn-block" style={{ opacity: loading ? 0.7 : 1 }}>
-                {loading ? 'Надсилаємо...' : 'Увійти'}
-              </button>
-            </form>
-          )}
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={loading}
+            className="btn btn-ghost btn-block"
+            style={{ gap: 12, opacity: loading ? 0.7 : 1 }}
+          >
+            <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
+              <path d="M43.6 20.5H42V20.5H24V27.5H35.3C33.7 32 29.3 35 24 35C17.4 35 12 29.6 12 23C12 16.4 17.4 11 24 11C27 11 29.8 12.1 31.9 14L37 8.9C33.5 5.7 29 3.5 24 3.5C13.5 3.5 5 12 5 22.5C5 33 13.5 41.5 24 41.5C34.5 41.5 43 33 43 22.5C43 21.8 42.9 21.1 43.6 20.5Z" fill="#FFC107"/>
+              <path d="M6.3 14.7L12.3 19.1C14.1 14.7 18.7 11 24 11C27 11 29.8 12.1 31.9 14L37 8.9C33.5 5.7 29 3.5 24 3.5C16.3 3.5 9.7 8.2 6.3 14.7Z" fill="#FF3D00"/>
+              <path d="M24 41.5C28.9 41.5 33.3 39.4 36.8 36.1L31.2 31.4C29.2 32.9 26.7 33.8 24 33.8C18.8 33.8 14.4 30.8 12.7 26.4L6.7 31C10 37.6 16.5 41.5 24 41.5Z" fill="#4CAF50"/>
+              <path d="M43.6 20.5H42V20.5H24V27.5H35.3C34.5 29.8 33 31.7 31.2 33L31.2 33L36.8 37.7C36.4 38.1 43 33 43 22.5C43 21.8 42.9 21.1 43.6 20.5Z" fill="#1976D2"/>
+            </svg>
+            {loading ? 'Переходимо...' : 'Увійти через Google'}
+          </button>
         </div>
       </div>
     </div>
