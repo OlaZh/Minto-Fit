@@ -102,6 +102,8 @@ export default function ActiveWorkout() {
         defaultReps: row.default_reps,
         defaultWeight: row.default_weight,
         alternatives: [],
+        hasWarmup: (row.default_weight ?? 0) > 0,
+        warmupDone: false,
         sets: Array.from({ length: row.default_sets }, (_, i) => ({
           weight: prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
           reps: prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
@@ -251,6 +253,26 @@ export default function ActiveWorkout() {
       if (i !== exIdx || exercise.sets.length <= 1) return exercise
       return { ...exercise, sets: exercise.sets.slice(0, -1) }
     }))
+  }
+
+  async function completeWarmup(exIdx) {
+    setExercises(prev => prev.map((ex, i) => (
+      i !== exIdx ? ex : { ...ex, warmupDone: true }
+    )))
+    const restSecs = getLS('mf_rest_seconds', 90)
+    restTotalRef.current = restSecs
+    setRest(restSecs)
+    if (!workoutId || isPreview) return
+    const ex = exercises[exIdx]
+    const displayExercise = replacedExercises[ex.exercise.id] ?? ex.exercise
+    supabase.from('mf_workout_sets').insert({
+      workout_id: workoutId,
+      exercise_id: displayExercise.id,
+      set_number: 0,
+      weight: Math.round((ex.sets[0]?.weight ?? ex.defaultWeight ?? 0) * 0.5),
+      reps: ex.sets[0]?.reps ?? ex.defaultReps,
+      completed: true,
+    })
   }
 
   async function saveNote(exerciseId, text) {
@@ -446,6 +468,28 @@ export default function ActiveWorkout() {
             </div>
           </div>
 
+          {Object.keys(rpe).length > 0 && (
+            <div className="stack" style={{ gap: 10 }}>
+              <div className="label" style={{ textAlign: 'center' }}>Оцінки вправ</div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'easy', label: 'Легко', color: '#4fc66a' },
+                  { key: 'normal', label: 'Нормально', color: '#FFC107' },
+                  { key: 'hard', label: 'На межі', color: '#ff5050' },
+                ].map(({ key, label, color }) => {
+                  const count = Object.values(rpe).filter(v => v === key).length
+                  if (!count) return null
+                  return (
+                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--text-2)' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                      {count}× {label}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             className="btn btn-primary btn-block"
@@ -570,7 +614,8 @@ export default function ActiveWorkout() {
           {exercises.map((exercise, exerciseIndex) => {
             const displayExercise = replacedExercises[exercise.exercise.id] ?? exercise.exercise
             const isReplaced = !!replacedExercises[exercise.exercise.id]
-            const warmupWeight = exercise.defaultWeight > 0 ? Math.round(exercise.defaultWeight * 0.5) : 0
+            const workingWeight = exercise.sets[0]?.weight ?? exercise.defaultWeight ?? 0
+            const warmupWeight = workingWeight > 0 ? Math.round(workingWeight * 0.5) : 0
             const exerciseDone = exercise.sets.every(set => set.completed)
 
             return (
@@ -618,6 +663,23 @@ export default function ActiveWorkout() {
                     <div>Повт.</div>
                     <div />
                   </div>
+
+                  {exercise.hasWarmup && (
+                    <div className="ex-row" data-done={exercise.warmupDone ? '1' : '0'}>
+                      <div className="set-num set-num--warmup">Р</div>
+                      <div className="set-last">розм.</div>
+                      <div className="set-value num">{warmupWeight}</div>
+                      <div className="set-value num">{exercise.sets[0]?.reps ?? exercise.defaultReps}</div>
+                      <button
+                        type="button"
+                        className="set-check"
+                        data-done={exercise.warmupDone ? '1' : '0'}
+                        onClick={() => completeWarmup(exerciseIndex)}
+                      >
+                        {exercise.warmupDone ? <IconCheck size={16} /> : ''}
+                      </button>
+                    </div>
+                  )}
 
                   {exercise.sets.map((set, setIndex) => {
                     const prev = prevSets[exercise.exercise.id]?.[setIndex]
@@ -722,6 +784,33 @@ export default function ActiveWorkout() {
                     )
                   })}
                 </div>
+
+                {exerciseDone && (
+                  <div className="ex-rpe">
+                    <div className="label" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>Як вправа?</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[
+                        { key: 'easy', label: 'Легко', bg: 'rgba(79,198,106,0.15)', border: '#4fc66a', dot: '#4fc66a' },
+                        { key: 'normal', label: 'Нормально', bg: 'rgba(255,193,7,0.15)', border: '#FFC107', dot: '#FFC107' },
+                        { key: 'hard', label: 'На межі', bg: 'rgba(255,80,80,0.15)', border: '#ff5050', dot: '#ff5050' },
+                      ].map(({ key, label, bg, border, dot }) => {
+                        const isActive = rpe[exercise.exercise.id] === key
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            className="rpe-btn"
+                            style={isActive ? { background: bg, borderColor: border, color: 'var(--text)' } : {}}
+                            onClick={() => setRpe(prev => ({ ...prev, [exercise.exercise.id]: key }))}
+                          >
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, display: 'inline-block', flexShrink: 0 }} />
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="ex-footer">
                   <button

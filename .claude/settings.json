@@ -8,7 +8,9 @@
       "Bash(npx vite *)",
       "Bash(npx @vite-pwa/assets-generator --preset minimal \"public/favicon.svg\")",
       "Bash(npx @vite-pwa/assets-generator)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\violk\\\\Desktop\\\\Minto Fit\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)"
     ],
     "additionalDirectories": [
       "c:\\Users\\violk\\.claude\\projects\\c--Users-violk-Desktop-Minto-Fit\\memory"
