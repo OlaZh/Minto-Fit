@@ -216,19 +216,30 @@ export default function ProgramEdit() {
 
             <div className="stack" style={{ gap: 6 }}>
               <div className="label">Група</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['основна', 'легка', 'мікс', 'додаткова'].map(g => (
-                  <button
-                    key={g}
-                    type="button"
-                    className="pill-btn"
-                    data-active={type === g ? '1' : '0'}
-                    onClick={() => setType(g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
+              <input
+                type="text"
+                value={type}
+                onChange={e => setType(e.target.value)}
+                placeholder="основна, легка, йога, вдома..."
+                className="field"
+                style={{ width: '100%' }}
+              />
+              {existingGroups.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {existingGroups.map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      className="pill-btn"
+                      data-active={type === g ? '1' : '0'}
+                      onClick={() => setType(g)}
+                      style={{ fontSize: 12 }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="stack" style={{ gap: 6 }}>
