@@ -143,9 +143,10 @@ export default function ProgramEdit() {
     }).filter(Boolean)
 
     if (isNew) {
+      const { data: { user } } = await supabase.auth.getUser()
       const { data: prog } = await supabase
         .from('mf_programs')
-        .insert({ name: name.trim(), type, color })
+        .insert({ name: name.trim(), type, color, user_id: user.id })
         .select()
         .single()
 
