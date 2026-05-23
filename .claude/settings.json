@@ -6,7 +6,9 @@
       "Bash(npx @vite-pwa/assets-generator --help)",
       "Bash(npx @vite-pwa/assets-generator --preset minimal \"Minto Fit Icon.svg\")",
       "Bash(npx vite *)",
-      "Bash(npx @vite-pwa/assets-generator --preset minimal \"public/favicon.svg\")"
+      "Bash(npx @vite-pwa/assets-generator --preset minimal \"public/favicon.svg\")",
+      "Bash(npx @vite-pwa/assets-generator)",
+      "Bash(npm install *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\violk\\.claude\\projects\\c--Users-violk-Desktop-Minto-Fit\\memory"
