@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npm create *)",
-      "Read(//c/Users/violk/.claude/projects/c--Users-violk-Desktop-Minto-Fit/**)"
+      "Read(//c/Users/violk/.claude/projects/c--Users-violk-Desktop-Minto-Fit/**)",
+      "Bash(npx @vite-pwa/assets-generator --help)",
+      "Bash(npx @vite-pwa/assets-generator --preset minimal \"Minto Fit Icon.svg\")",
+      "Bash(npx vite *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\violk\\.claude\\projects\\c--Users-violk-Desktop-Minto-Fit\\memory"
