@@ -14,7 +14,8 @@ function formatRecordDate(dateStr) {
   if (diff < 30) return `${Math.floor(diff / 7)} тиж. тому`
   return new Date(dateStr).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
 }
-const WEEKS = 16
+const WEEKS_BACK = 4
+const WEEKS_FORWARD = 2
 const YEAR_WEEKS = 52
 
 // Sun=0, Mon=1…Sat=6 — display Mon→Sun (Ukrainian convention)
@@ -133,11 +134,15 @@ export default function Progress() {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
   const startDay = new Date(today)
-  startDay.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7)
+  startDay.setDate(today.getDate() - (today.getDay() || 7) + 1 - WEEKS_BACK * 7)
+
+  const endDay = new Date(today)
+  endDay.setDate(today.getDate() - (today.getDay() || 7) + 1 + (WEEKS_FORWARD + 1) * 7 - 1)
 
   const grid = []
-  for (let date = new Date(startDay); date <= today; date.setDate(date.getDate() + 1)) {
+  for (let date = new Date(startDay); date <= endDay; date.setDate(date.getDate() + 1)) {
     grid.push(new Date(date))
   }
 
@@ -263,7 +268,7 @@ export default function Progress() {
           <div className="card-row" style={{ marginBottom: 20 }}>
             <div>
               <div className="h-3">Відвідування</div>
-              <div className="meta" style={{ marginTop: 8 }}>Останні 16 тижнів</div>
+              <div className="meta" style={{ marginTop: 8 }}>Місяць назад — 2 тижні вперед</div>
             </div>
             <span className="meta" style={{ fontSize: 11, color: 'var(--text-3)' }}>рік →</span>
           </div>
@@ -288,6 +293,8 @@ export default function Progress() {
                 {weeks.map((week, wi) => {
                   const day = week[dayIdx]
                   if (!day) return <div key={wi} className="tracker-cell" style={{ opacity: 0, border: 'none' }} />
+                  const isFuture = day > today
+                  const isToday = day.toDateString() === today.toDateString()
                   const color = workoutByDate[day.toDateString()]
                   return (
                     <div
@@ -295,9 +302,10 @@ export default function Progress() {
                       className="tracker-cell"
                       title={day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
                       style={{
-                        background: color ?? 'var(--surface-2)',
-                        borderColor: color ? 'transparent' : 'var(--border)',
+                        background: color ? color : isFuture ? 'transparent' : 'var(--surface-2)',
+                        borderColor: color ? 'transparent' : isToday ? 'var(--accent)' : isFuture ? 'var(--border)' : 'var(--border)',
                         boxShadow: color ? `0 0 6px ${color}66` : 'none',
+                        opacity: isFuture ? 0.3 : 1,
                       }}
                     />
                   )

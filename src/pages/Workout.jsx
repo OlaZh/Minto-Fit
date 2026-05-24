@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ProfileSheet from '../components/ProfileSheet'
@@ -6,11 +6,11 @@ import { IconUser, IconPlay, getProgramIcon } from '../components/Icons'
 
 const WEEK_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд']
 
-function getWeekDays() {
+function getWeekDays(offset = 0) {
   const today = new Date()
   const dow = today.getDay()
   const monday = new Date(today)
-  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + offset * 7)
   monday.setHours(0, 0, 0, 0)
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
@@ -51,20 +51,41 @@ export default function Workout() {
   const [nextProgram, setNextProgram] = useState(null)
   const [progStats, setProgStats] = useState({ exercises: 0, sets: 0, est: 0 })
   const [stats, setStats] = useState({ count: 0, hours: 0, streak: 0 })
-  const [weekMap, setWeekMap] = useState({})
+  const [allWeekWos, setAllWeekWos] = useState([])
+  const [weekOffset, setWeekOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const touchStartX = useRef(null)
   const navigate = useNavigate()
 
-  const weekDays = getWeekDays()
+  const weekDays = useMemo(() => getWeekDays(weekOffset), [weekOffset])
+
+  const weekMap = useMemo(() => {
+    const wm = {}
+    for (const w of allWeekWos) {
+      const key = new Date(w.started_at).toDateString()
+      wm[key] = { color: w.program?.color ?? '#22c55e' }
+    }
+    return wm
+  }, [allWeekWos])
+
+  const weekLabel = useMemo(() => {
+    if (weekOffset === 0) return 'ЦЬОГО ТИЖНЯ'
+    if (weekOffset === -1) return 'МИНУЛИЙ ТИЖДЕНЬ'
+    const s = weekDays[0].toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }).replace(' р.', '')
+    const e = weekDays[6].toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }).replace(' р.', '')
+    return `${s} — ${e}`
+  }, [weekOffset, weekDays])
 
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
     const { data: user } = await supabase.auth.getUser()
     const uid = user.user.id
-    const weekStart = weekDays[0].toISOString()
+
+    const eightWeeksAgo = new Date(weekDays[0])
+    eightWeeksAgo.setDate(weekDays[0].getDate() - 7 * 7)
 
     const [
       { data: progs },
@@ -75,7 +96,7 @@ export default function Workout() {
       supabase.from('mf_programs').select('*').order('type').order('name'),
       supabase.from('mf_workouts').select('program_id').eq('user_id', uid).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('mf_workouts').select('started_at, duration_minutes').eq('user_id', uid).not('finished_at', 'is', null),
-      supabase.from('mf_workouts').select('started_at, program:mf_programs(name, color)').eq('user_id', uid).not('finished_at', 'is', null).gte('started_at', weekStart),
+      supabase.from('mf_workouts').select('started_at, program:mf_programs(name, color)').eq('user_id', uid).not('finished_at', 'is', null).gte('started_at', eightWeeksAgo.toISOString()),
     ])
 
     const programList = progs ?? []
@@ -86,15 +107,7 @@ export default function Workout() {
     const streak = calcStreak(allWos ?? [])
     setStats({ count: totalCount, hours: Math.round(totalMinutes / 60 * 10) / 10, streak })
 
-    const wm = {}
-    for (const w of weekWos ?? []) {
-      const key = new Date(w.started_at).toDateString()
-      wm[key] = {
-        name: w.program?.name?.replace(/\s+—.+$/, '') ?? '—',
-        color: w.program?.color ?? '#22c55e',
-      }
-    }
-    setWeekMap(wm)
+    setAllWeekWos(weekWos ?? [])
 
     const main = programList.filter(p => p.type === 'основна')
     let suggested = main[0] ?? programList[0] ?? null
@@ -251,12 +264,36 @@ export default function Workout() {
         </div>
 
         {/* ── BLOCK 3: week ── */}
-        <div className="card" style={{ padding: '14px 12px' }}>
-          <div className="label" style={{ marginBottom: 10, fontSize: 10, letterSpacing: 0.5, paddingLeft: 2 }}>ЦЬОГО ТИЖНЯ</div>
+        <div
+          className="card"
+          style={{ padding: '14px 12px', userSelect: 'none' }}
+          onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
+          onTouchEnd={e => {
+            if (touchStartX.current === null) return
+            const dx = e.changedTouches[0].clientX - touchStartX.current
+            touchStartX.current = null
+            if (Math.abs(dx) < 40) return
+            if (dx < 0) setWeekOffset(prev => Math.max(prev - 1, -7))
+            else setWeekOffset(prev => Math.min(prev + 1, 0))
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => setWeekOffset(prev => Math.max(prev - 1, -7))}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '0 4px', fontSize: 16, lineHeight: 1 }}
+            >‹</button>
+            <div className="label" style={{ fontSize: 10, letterSpacing: 0.5 }}>{weekLabel}</div>
+            <button
+              type="button"
+              onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: weekOffset === 0 ? 'transparent' : 'var(--text-3)', padding: '0 4px', fontSize: 16, lineHeight: 1, pointerEvents: weekOffset === 0 ? 'none' : 'auto' }}
+            >›</button>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {weekDays.map((day, i) => {
               const key = day.toDateString()
-              const isToday = key === new Date().toDateString()
+              const isToday = weekOffset === 0 && key === new Date().toDateString()
               const entry = weekMap[key]
               const hasWorkout = !!entry
               const wColor = entry?.color ?? '#22c55e'
