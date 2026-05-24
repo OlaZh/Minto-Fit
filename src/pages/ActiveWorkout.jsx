@@ -48,6 +48,7 @@ export default function ActiveWorkout() {
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [selectedMood, setSelectedMood] = useState('нормально')
   const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false })
+  const [cardioFinish, setCardioFinish] = useState({ type: 'Еліпс', duration: 20, done: false })
   const [rpe, setRpe] = useState({})
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [replacedExercises, setReplacedExercises] = useState({})
@@ -1058,6 +1059,52 @@ export default function ActiveWorkout() {
             )
           })}
         </div>
+
+        {program?.has_cardio_finish && !isPreview && (
+          <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+              <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}>
+                <IconFlame size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="h-3" style={{ fontSize: 15 }}>Кардіо після тренування</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                  <select
+                    value={cardioFinish.type}
+                    onChange={e => setCardioFinish(v => ({ ...v, type: e.target.value }))}
+                    className="select-field"
+                  >
+                    {['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер'].map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input
+                      type="number"
+                      value={cardioFinish.duration}
+                      onChange={e => setCardioFinish(v => ({ ...v, duration: Number(e.target.value) || 0 }))}
+                      className="field"
+                      style={{ width: 62, textAlign: 'center' }}
+                    />
+                    <span className="meta">хв</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCardioFinish(v => ({ ...v, done: !v.done }))}
+              className="icon-btn"
+              style={{
+                background: cardioFinish.done ? 'var(--accent)' : 'var(--surface-2)',
+                color: cardioFinish.done ? 'var(--accent-text)' : 'var(--text-2)',
+                borderColor: cardioFinish.done ? 'transparent' : 'var(--border)',
+              }}
+            >
+              {cardioFinish.done ? <IconCheck size={18} /> : ''}
+            </button>
+          </div>
+        )}
       </div>
       </div>
 

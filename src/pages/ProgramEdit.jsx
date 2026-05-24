@@ -41,6 +41,7 @@ export default function ProgramEdit() {
   const [color, setColor] = useState('')
   const [usedColors, setUsedColors] = useState([])
   const [hasCardio, setHasCardio] = useState(true)
+  const [hasCardioFinish, setHasCardioFinish] = useState(false)
   const [activityType, setActivityType] = useState('силове')
   const [existingGroups, setExistingGroups] = useState([])
   const [exercises, setExercises] = useState([])
@@ -77,6 +78,7 @@ export default function ProgramEdit() {
           setType(prog.type ?? 'основна')
           setColor(prog.color ?? '')
           setHasCardio(prog.has_cardio ?? true)
+          setHasCardioFinish(prog.has_cardio_finish ?? false)
           setActivityType(prog.activity_type ?? 'силове')
         }
         setExercises((exs ?? []).map(e => ({
@@ -169,7 +171,7 @@ export default function ProgramEdit() {
         const { data: { user } } = await supabase.auth.getUser()
         const { data: prog, error: progErr } = await supabase
           .from('mf_programs')
-          .insert({ name: name.trim(), type, color, has_cardio: hasCardio, activity_type: activityType, user_id: user.id })
+          .insert({ name: name.trim(), type, color, has_cardio: hasCardio, has_cardio_finish: hasCardioFinish, activity_type: activityType, user_id: user.id })
           .select()
           .single()
         if (progErr) throw new Error(progErr.message)
@@ -183,7 +185,7 @@ export default function ProgramEdit() {
         await Promise.all(exercises.map(saveExerciseMeta))
         navigate(`/programs/${prog.id}`)
       } else {
-        const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color, has_cardio: hasCardio, activity_type: activityType }).eq('id', id)
+        const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color, has_cardio: hasCardio, has_cardio_finish: hasCardioFinish, activity_type: activityType }).eq('id', id)
         if (updErr) throw new Error(updErr.message)
 
         await supabase.from('mf_program_exercises').delete().eq('program_id', id)
@@ -329,33 +331,39 @@ export default function ProgramEdit() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setHasCardio(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', borderRadius: 12,
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                cursor: 'pointer', width: '100%', textAlign: 'left',
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>Кардіо розминка</div>
-                <div className="meta" style={{ marginTop: 2 }}>Блок на початку тренування</div>
-              </div>
-              <div style={{
-                width: 42, height: 24, borderRadius: 12, flexShrink: 0,
-                background: hasCardio ? 'var(--accent)' : 'var(--surface-3)',
-                position: 'relative', transition: 'background 0.2s',
-              }}>
+            {[
+              { value: hasCardio, setter: setHasCardio, label: 'Кардіо розминка', sub: 'Блок на початку тренування' },
+              { value: hasCardioFinish, setter: setHasCardioFinish, label: 'Кардіо після тренування', sub: 'Блок в кінці тренування' },
+            ].map(({ value, setter, label, sub }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setter(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', borderRadius: 12,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  cursor: 'pointer', width: '100%', textAlign: 'left',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
+                  <div className="meta" style={{ marginTop: 2 }}>{sub}</div>
+                </div>
                 <div style={{
-                  position: 'absolute', top: 3, left: hasCardio ? 20 : 3,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: hasCardio ? 'var(--bg)' : 'var(--text-3)',
-                  transition: 'left 0.2s',
-                }} />
-              </div>
-            </button>
+                  width: 42, height: 24, borderRadius: 12, flexShrink: 0,
+                  background: value ? 'var(--accent)' : 'var(--surface-3)',
+                  position: 'relative', transition: 'background 0.2s',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: 3, left: value ? 20 : 3,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: value ? 'var(--bg)' : 'var(--text-3)',
+                    transition: 'left 0.2s',
+                  }} />
+                </div>
+              </button>
+            ))}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
               <div className="prog-icon" style={{ background: `${color}18` }}>
