@@ -45,10 +45,13 @@ export default function ActiveWorkout() {
   const [menuSection, setMenuSection] = useState(null)
   const [editingCell, setEditingCell] = useState(null)
   const [noteEdit, setNoteEdit] = useState(null)
+  const [restMissedSecs, setRestMissedSecs] = useState(null)
 
   const wakeLockRef = useRef(null)
   const elapsedRef = useRef(null)
+  const startedAtRef = useRef(null)
   const restRef = useRef(null)
+  const restStartedAtRef = useRef(null)
   const restTotalRef = useRef(getLS('mf_rest_seconds', 90))
 
   const isPreview = !!window.history.state?.usr?.preview
@@ -193,6 +196,21 @@ export default function ActiveWorkout() {
   }, [])
 
   useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (restStartedAtRef.current === null) return
+      const remaining = restTotalRef.current - Math.floor((Date.now() - restStartedAtRef.current) / 1000)
+      if (remaining <= 0) {
+        setRestMissedSecs(Math.abs(remaining))
+        setRest(null)
+        restStartedAtRef.current = null
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
+  useEffect(() => {
     const up = () => setIsOnline(true)
     const down = () => setIsOnline(false)
     window.addEventListener('online', up)
@@ -202,20 +220,40 @@ export default function ActiveWorkout() {
 
   useEffect(() => {
     if (loading || isPreview) return
-    elapsedRef.current = setInterval(() => setElapsed(value => value + 1), 1000)
-    return () => clearInterval(elapsedRef.current)
+    const saved = getLS('mf_workout_started_at', null)
+    startedAtRef.current = saved ?? Date.now()
+    if (!saved) localStorage.setItem('mf_workout_started_at', JSON.stringify(startedAtRef.current))
+    elapsedRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000))
+    }, 1000)
+    return () => {
+      clearInterval(elapsedRef.current)
+      localStorage.removeItem('mf_workout_started_at')
+    }
   }, [loading])
 
   useEffect(() => {
-    if (rest === null) return
-    if (rest === 0) {
-      if (getLS('mf_sound_enabled', true)) playBeep()
-      if (getLS('mf_vibration_enabled', true) && navigator.vibrate) navigator.vibrate([300, 100, 300])
-      setRest(null)
+    if (rest === null) {
+      restStartedAtRef.current = null
       return
     }
 
-    restRef.current = setTimeout(() => setRest(value => value - 1), 1000)
+    if (restStartedAtRef.current === null) {
+      restStartedAtRef.current = Date.now()
+    }
+
+    const tick = () => {
+      const remaining = restTotalRef.current - Math.floor((Date.now() - restStartedAtRef.current) / 1000)
+      if (remaining <= 0) {
+        if (getLS('mf_sound_enabled', true)) playBeep()
+        if (getLS('mf_vibration_enabled', true) && navigator.vibrate) navigator.vibrate([300, 100, 300])
+        setRest(null)
+      } else {
+        setRest(remaining)
+      }
+    }
+
+    restRef.current = setTimeout(tick, 1000)
     return () => clearTimeout(restRef.current)
   }, [rest])
 
@@ -278,6 +316,8 @@ export default function ActiveWorkout() {
     )))
     const restSecs = getLS('mf_rest_seconds', 90)
     restTotalRef.current = restSecs
+    restStartedAtRef.current = Date.now()
+    setRestMissedSecs(null)
     setRest(restSecs)
     if (!workoutId || isPreview) return
     const ex = exercises[exIdx]
@@ -344,6 +384,8 @@ export default function ActiveWorkout() {
     updateSet(exIdx, setIdx, 'completed', true)
     const restSecs = getLS('mf_rest_seconds', 90)
     restTotalRef.current = restSecs
+    restStartedAtRef.current = Date.now()
+    setRestMissedSecs(null)
     setRest(restSecs)
     if (!workoutId) return
 
@@ -580,6 +622,38 @@ export default function ActiveWorkout() {
           </div>
         )}
 
+        {restMissedSecs !== null && (
+          <button
+            type="button"
+            onClick={() => setRestMissedSecs(null)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(198,255,61,0.1)',
+              border: '1px solid rgba(198,255,61,0.35)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              marginBottom: -4,
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+                Відпочинок завершено
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                {restMissedSecs < 60
+                  ? `${restMissedSecs} сек тому — час до підходу!`
+                  : `${Math.round(restMissedSecs / 60)} хв тому — час до підходу!`}
+              </div>
+            </div>
+            <IconX size={16} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+          </button>
+        )}
+
         {!isPreview && (
           <section className="stack" style={{ gap: 10 }}>
             <div className="progress-strip">
@@ -644,10 +718,16 @@ export default function ActiveWorkout() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button type="button" className="btn btn-dark btn-sm" onClick={() => setRest(value => (value ?? 0) + 15)}>
+              <button type="button" className="btn btn-dark btn-sm" onClick={() => {
+                restStartedAtRef.current = Date.now() - ((restTotalRef.current - (rest ?? 0) - 15) * 1000)
+                setRest(value => (value ?? 0) + 15)
+              }}>
                 +15с
               </button>
-              <button type="button" className="btn btn-dark btn-sm" onClick={() => setRest(null)}>
+              <button type="button" className="btn btn-dark btn-sm" onClick={() => {
+                restStartedAtRef.current = null
+                setRest(null)
+              }}>
                 Пропустити
               </button>
             </div>
