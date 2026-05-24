@@ -42,7 +42,7 @@ export default function ProgramDetail() {
         supabase.from('mf_programs').select('*').eq('id', id).single(),
         supabase
           .from('mf_program_exercises')
-          .select('id, order, default_sets, default_reps, default_weight, default_duration, exercise:mf_exercises(*)')
+          .select('*, exercise:mf_exercises(*)')
           .eq('program_id', id)
           .order('order'),
       ])
