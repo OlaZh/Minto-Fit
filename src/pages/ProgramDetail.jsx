@@ -13,9 +13,10 @@ function ProgramIcon({ program }) {
 }
 
 const EX_FIELDS = [
-  { key: 'default_sets',   label: 'Підходи',   min: 1,   step: 1   },
-  { key: 'default_reps',   label: 'Повтори',   min: 1,   step: 1   },
-  { key: 'default_weight', label: 'Вага, кг',  min: 0,   step: 0.5 },
+  { key: 'default_sets',     label: 'Підходи',  min: 1, step: 1   },
+  { key: 'default_reps',     label: 'Повтори',  min: 1, step: 1   },
+  { key: 'default_weight',   label: 'Вага, кг', min: 0, step: 0.5 },
+  { key: 'default_duration', label: 'Час, хв',  min: 0, step: 1   },
 ]
 
 export default function ProgramDetail() {
@@ -41,7 +42,7 @@ export default function ProgramDetail() {
         supabase.from('mf_programs').select('*').eq('id', id).single(),
         supabase
           .from('mf_program_exercises')
-          .select('id, order, default_sets, default_reps, default_weight, exercise:mf_exercises(*)')
+          .select('id, order, default_sets, default_reps, default_weight, default_duration, exercise:mf_exercises(*)')
           .eq('program_id', id)
           .order('order'),
       ])

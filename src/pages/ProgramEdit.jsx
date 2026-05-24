@@ -62,7 +62,7 @@ export default function ProgramEdit() {
           sets:     e.default_sets   != null ? String(e.default_sets)   : '',
           reps:     e.default_reps   != null ? String(e.default_reps)   : '',
           weight:   e.default_weight != null ? String(e.default_weight) : '',
-          duration: '',
+          duration: e.default_duration != null ? String(e.default_duration) : '',
           description: e.exercise.description ?? '',
           photo_url: e.exercise.machine_photo_url ?? '',
         })))
@@ -127,9 +127,10 @@ export default function ProgramEdit() {
       program_id: progId,
       exercise_id: e.exercise_id,
       order: i + 1,
-      default_sets:   toNum(e.sets),
-      default_reps:   toNum(e.reps),
-      default_weight: toNum(e.weight),
+      default_sets:     toNum(e.sets),
+      default_reps:     toNum(e.reps),
+      default_weight:   toNum(e.weight),
+      default_duration: toNum(e.duration),
     })
 
     const saveExerciseMeta = async (e) => {
