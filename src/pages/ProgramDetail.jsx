@@ -235,53 +235,50 @@ export default function ProgramDetail() {
                 </div>
 
                 {/* Editable fields */}
-                {(row.default_sets != null || row.default_reps != null || row.default_weight != null) && (
-                  <div style={{ display: 'flex', gap: 0, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                    {EX_FIELDS.map((f, i) => {
-                      const val = row[f.key]
-                      if (val == null) return null
-                      const isEditing = editingCell?.peId === row.id && editingCell?.field === f.key
-                      return (
-                        <div
-                          key={f.key}
-                          style={{
-                            flex: 1,
-                            borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            background: 'var(--surface-2)',
-                          }}
-                        >
-                          <div className="meta" style={{ fontSize: 10, marginBottom: 4 }}>{f.label}</div>
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              step={f.step}
-                              defaultValue={val}
-                              autoFocus
-                              className="set-inline-input"
-                              style={{ width: '100%', textAlign: 'center' }}
-                              onBlur={e => commitField(row.id, f.key, e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') commitField(row.id, f.key, e.currentTarget.value)
-                                if (e.key === 'Escape') setEditingCell(null)
-                              }}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className="set-edit-btn num"
-                              style={{ width: '100%', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}
-                              onClick={() => setEditingCell({ peId: row.id, field: f.key })}
-                            >
-                              {val}
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 0, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                  {EX_FIELDS.map((f, i) => {
+                    const val = row[f.key]
+                    const isEditing = editingCell?.peId === row.id && editingCell?.field === f.key
+                    return (
+                      <div
+                        key={f.key}
+                        style={{
+                          flex: 1,
+                          borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
+                          padding: '10px 8px',
+                          textAlign: 'center',
+                          background: 'var(--surface-2)',
+                        }}
+                      >
+                        <div className="meta" style={{ fontSize: 10, marginBottom: 4 }}>{f.label}</div>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            step={f.step}
+                            defaultValue={val ?? ''}
+                            autoFocus
+                            className="set-inline-input"
+                            style={{ width: '100%', textAlign: 'center' }}
+                            onBlur={e => commitField(row.id, f.key, e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') commitField(row.id, f.key, e.currentTarget.value)
+                              if (e.key === 'Escape') setEditingCell(null)
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="set-edit-btn num"
+                            style={{ width: '100%', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}
+                            onClick={() => setEditingCell({ peId: row.id, field: f.key })}
+                          >
+                            {val ?? '—'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
 
                 {/* Description */}
                 {(exercise.description || editingDesc === exercise.id) && (
