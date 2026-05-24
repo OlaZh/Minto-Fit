@@ -118,8 +118,9 @@ export default function Workout() {
     ])
     const exercises = exs?.length ?? 0
     const sets = (exs ?? []).reduce((s, e) => s + (e.default_sets ?? 3), 0)
+    const isEstimate = !lastWo?.duration_minutes
     const est = lastWo?.duration_minutes ?? sets * 3
-    setProgStats({ exercises, sets, est })
+    setProgStats({ exercises, sets, est, isEstimate })
   }
 
   async function selectProgram(prog) {
@@ -209,7 +210,7 @@ export default function Workout() {
                 {[
                   { val: progStats.exercises, lbl: 'ВПРАВ' },
                   { val: progStats.sets,      lbl: 'ПІДХОДІВ' },
-                  { val: `≈${progStats.est}`, lbl: 'ХВ' },
+                  { val: progStats.isEstimate ? `≈${progStats.est}` : progStats.est, lbl: 'ХВ' },
                 ].map((s, i) => (
                   <div key={i} style={{ flex: 1, textAlign: 'center', borderLeft: i ? '1px solid var(--border)' : 'none', paddingLeft: i ? 0 : 0 }}>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>{s.val}</div>
@@ -297,12 +298,10 @@ export default function Workout() {
                   </div>
                   {hasWorkout && (
                     <div style={{
-                      fontSize: 8, color: wColor, textAlign: 'center',
-                      maxWidth: '100%', overflow: 'hidden', whiteSpace: 'nowrap',
-                      textOverflow: 'ellipsis', paddingInline: 2, lineHeight: 1.2,
-                    }}>
-                      {entry.name}
-                    </div>
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: wColor,
+                      boxShadow: `0 0 5px ${wColor}`,
+                    }} />
                   )}
                 </div>
               )
