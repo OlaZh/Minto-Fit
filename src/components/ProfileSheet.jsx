@@ -33,6 +33,7 @@ export default function ProfileSheet({ onClose }) {
   const [age, setAge] = useState(() => getLS('mf_age', ''))
   const [height, setHeight] = useState(() => getLS('mf_height', ''))
   const [goal, setGoal] = useState(() => getLS('mf_goal', ''))
+  const [goalWeight, setGoalWeight] = useState(() => getLS('mf_goal_weight', ''))
   const [sound, setSound] = useState(() => getLS('mf_sound_enabled', true))
   const [vibration, setVibration] = useState(() => getLS('mf_vibration_enabled', true))
   const [wakeLock, setWakeLock] = useState(() => getLS('mf_wake_lock_enabled', true))
@@ -125,6 +126,25 @@ export default function ProfileSheet({ onClose }) {
                 />
               </div>
             </div>
+            <div
+              className="card-row"
+              style={{ padding: '12px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+            >
+              <label style={{ color: 'var(--text)', fontSize: 14 }}>Ціль ваги</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  step={0.1}
+                  value={goalWeight}
+                  onChange={e => { setGoalWeight(e.target.value); setLS('mf_goal_weight', e.target.value) }}
+                  placeholder="—"
+                  className="field"
+                  style={{ width: 72, textAlign: 'right', background: 'transparent', border: 0, paddingRight: 0 }}
+                />
+                <span className="meta" style={{ width: 22 }}>кг</span>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {GOALS.map(g => (
                 <button

@@ -173,9 +173,18 @@ export default function Progress() {
       }))
   }, [activeFieldKey, bodyStats])
 
+  const goalWeight = (() => {
+    try {
+      if (activeFieldKey !== 'weight_kg') return null
+      const v = localStorage.getItem('mf_goal_weight')
+      return v ? parseFloat(JSON.parse(v)) : null
+    } catch { return null }
+  })()
+
   const values = chartData.map(item => item.value)
-  const min = values.length ? Math.min(...values) : 0
-  const max = values.length ? Math.max(...values) : 0
+  const allValuesForRange = goalWeight != null ? [...values, goalWeight] : values
+  const min = allValuesForRange.length ? Math.min(...allValuesForRange) : 0
+  const max = allValuesForRange.length ? Math.max(...allValuesForRange) : 0
   const range = max - min || 1
   const chartWidth = 320
   const chartHeight = 116
@@ -187,6 +196,10 @@ export default function Progress() {
     const y = chartHeight - padY - ((item.value - min) / range) * (chartHeight - padY * 2)
     return { x, y, ...item }
   })
+
+  const goalY = goalWeight != null
+    ? chartHeight - padY - ((goalWeight - min) / range) * (chartHeight - padY * 2)
+    : null
 
   const pathD = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
   const areaD = points.length
@@ -335,6 +348,13 @@ export default function Progress() {
                   {delta > 0 ? '+' : ''}{delta.toFixed(1)}{activeField.unit}
                 </div>
               )}
+              {goalWeight != null && latestValue != null && (
+                <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(96,165,250,0.9)', fontWeight: 600 }}>
+                  {latestValue === goalWeight
+                    ? 'Ціль досягнута!'
+                    : `до цілі ${Math.abs(latestValue - goalWeight).toFixed(1)} кг`}
+                </div>
+              )}
             </div>
           </div>
 
@@ -390,6 +410,30 @@ export default function Progress() {
                     strokeDasharray="3 5"
                   />
                 ))}
+
+                {goalY != null && (
+                  <>
+                    <line
+                      x1={padX}
+                      x2={chartWidth - padX}
+                      y1={goalY}
+                      y2={goalY}
+                      stroke="rgba(96,165,250,0.7)"
+                      strokeWidth="1.5"
+                      strokeDasharray="5 4"
+                    />
+                    <text
+                      x={chartWidth - padX - 2}
+                      y={goalY - 4}
+                      textAnchor="end"
+                      fill="rgba(96,165,250,0.9)"
+                      fontSize="10"
+                      fontWeight="600"
+                    >
+                      {goalWeight} кг
+                    </text>
+                  </>
+                )}
 
                 <path d={areaD} fill="url(#body-area)" />
                 <path
