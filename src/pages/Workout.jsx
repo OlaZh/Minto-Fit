@@ -89,7 +89,10 @@ export default function Workout() {
     const wm = {}
     for (const w of weekWos ?? []) {
       const key = new Date(w.started_at).toDateString()
-      wm[key] = w.program?.name?.replace(/\s+—.+$/, '') ?? '—'
+      wm[key] = {
+        name: w.program?.name?.replace(/\s+—.+$/, '') ?? '—',
+        color: w.program?.color ?? '#22c55e',
+      }
     }
     setWeekMap(wm)
 
@@ -160,6 +163,7 @@ export default function Workout() {
               padding: 20,
               background: `radial-gradient(130% 110% at 105% 0%, ${progColor}28, transparent 60%), var(--surface)`,
               borderColor: `${progColor}55`,
+              boxShadow: `0 6px 24px ${progColor}20`,
             }}
           >
             <div className="stack" style={{ gap: 16 }}>
@@ -246,38 +250,60 @@ export default function Workout() {
         </div>
 
         {/* ── BLOCK 3: week ── */}
-        <div
-          className="card"
-          style={{
-            padding: '14px 16px',
-            background: 'radial-gradient(80% 100% at 100% 0%, #3b82f618, transparent), var(--surface)',
-            borderColor: '#3b82f640',
-          }}
-        >
-          <div className="label" style={{ marginBottom: 12, fontSize: 10, letterSpacing: 0.5 }}>ЦЬОГО ТИЖНЯ</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        <div className="card" style={{ padding: '14px 12px' }}>
+          <div className="label" style={{ marginBottom: 10, fontSize: 10, letterSpacing: 0.5, paddingLeft: 2 }}>ЦЬОГО ТИЖНЯ</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {weekDays.map((day, i) => {
               const key = day.toDateString()
               const isToday = key === new Date().toDateString()
-              const progName = weekMap[key]
-              const hasWorkout = !!progName
+              const entry = weekMap[key]
+              const hasWorkout = !!entry
+              const wColor = entry?.color ?? '#22c55e'
 
               return (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                  <div className="meta" style={{ fontSize: 10, color: isToday ? 'var(--text)' : 'var(--text-3)', fontWeight: isToday ? 600 : 400 }}>
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                    padding: '8px 2px',
+                    borderRadius: 12,
+                    background: hasWorkout
+                      ? `${wColor}18`
+                      : isToday
+                      ? 'var(--surface-2)'
+                      : 'transparent',
+                    border: `1px solid ${hasWorkout ? `${wColor}40` : isToday ? 'var(--border)' : 'transparent'}`,
+                    boxShadow: hasWorkout ? `0 2px 10px ${wColor}25` : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{
+                    fontSize: 10,
+                    color: isToday ? 'var(--text)' : 'var(--text-3)',
+                    fontWeight: isToday ? 700 : 400,
+                    letterSpacing: 0.2,
+                  }}>
                     {WEEK_LABELS[i]}
                   </div>
                   <div style={{
-                    width: 9, height: 9, borderRadius: '50%',
-                    background: hasWorkout ? '#22c55e' : isToday ? 'var(--text-3)' : 'var(--border)',
-                    boxShadow: hasWorkout ? '0 0 6px #22c55e88' : 'none',
-                  }} />
-                  <div style={{
-                    fontSize: 9, color: 'var(--text-3)', textAlign: 'center',
-                    maxWidth: 38, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                    width: 26, height: 26, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: hasWorkout ? `${wColor}28` : 'transparent',
+                    fontSize: 12,
+                    fontWeight: hasWorkout || isToday ? 700 : 400,
+                    color: hasWorkout ? wColor : isToday ? 'var(--text)' : 'var(--text-3)',
                   }}>
-                    {progName ?? ''}
+                    {day.getDate()}
                   </div>
+                  {hasWorkout && (
+                    <div style={{
+                      fontSize: 8, color: wColor, textAlign: 'center',
+                      maxWidth: '100%', overflow: 'hidden', whiteSpace: 'nowrap',
+                      textOverflow: 'ellipsis', paddingInline: 2, lineHeight: 1.2,
+                    }}>
+                      {entry.name}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -346,7 +372,12 @@ function StatCard({ value, unit, label, color }) {
         padding: '14px 12px',
         background: `radial-gradient(110% 100% at 100% 0%, ${color}1c, transparent), var(--surface)`,
         borderColor: `${color}35`,
+        boxShadow: `0 4px 16px ${color}18`,
+        transition: 'transform 0.15s, box-shadow 0.15s',
       }}
+      onPointerDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; e.currentTarget.style.boxShadow = `0 2px 8px ${color}10` }}
+      onPointerUp={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = `0 4px 16px ${color}18` }}
+      onPointerLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = `0 4px 16px ${color}18` }}
     >
       <div className="label" style={{ fontSize: 9, letterSpacing: 0.5, color, marginBottom: 8 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{value}</div>
