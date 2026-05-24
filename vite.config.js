@@ -19,6 +19,16 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
           },
+          {
+            urlPattern: /^https:\/\/[^/]+\.supabase\.co\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-api',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
         ],
       },
       manifest: {

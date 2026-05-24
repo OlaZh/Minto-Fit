@@ -38,6 +38,7 @@ export default function ActiveWorkout() {
   const [selectedMood, setSelectedMood] = useState('нормально')
   const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false })
   const [rpe, setRpe] = useState({})
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [replacedExercises, setReplacedExercises] = useState({})
   const [originalSets, setOriginalSets] = useState({})
   const [menuExerciseId, setMenuExerciseId] = useState(null)
@@ -150,16 +151,16 @@ export default function ActiveWorkout() {
           .limit(1)
           .maybeSingle()
 
-        let workoutRow = existingWorkout
-        if (!workoutRow) {
-          const { data: newWorkout } = await supabase
-            .from('mf_workouts')
-            .insert({ user_id: uid, program_id: programId })
-            .select('id')
-            .single()
-          workoutRow = newWorkout
+        if (existingWorkout) {
+          setWorkoutId(existingWorkout.id)
+          localStorage.setItem('mf_current_workout', JSON.stringify({ id: existingWorkout.id, programId }))
+        } else {
+          const saved = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
+          const localId = (saved?.programId === programId) ? saved.id : crypto.randomUUID()
+          setWorkoutId(localId)
+          localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId }))
+          supabase.from('mf_workouts').insert({ id: localId, user_id: uid, program_id: programId })
         }
-        setWorkoutId(workoutRow.id)
       }
 
       setLoading(false)
@@ -189,6 +190,14 @@ export default function ActiveWorkout() {
       document.removeEventListener('visibilitychange', onVisible)
       wakeLockRef.current?.release()
     }
+  }, [])
+
+  useEffect(() => {
+    const up = () => setIsOnline(true)
+    const down = () => setIsOnline(false)
+    window.addEventListener('online', up)
+    window.addEventListener('offline', down)
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down) }
   }, [])
 
   useEffect(() => {
@@ -255,6 +264,14 @@ export default function ActiveWorkout() {
     }))
   }
 
+  function enqueuePendingSet(data) {
+    try {
+      const q = JSON.parse(localStorage.getItem('mf_pending_sets') || '[]')
+      q.push(data)
+      localStorage.setItem('mf_pending_sets', JSON.stringify(q))
+    } catch {}
+  }
+
   async function completeWarmup(exIdx) {
     setExercises(prev => prev.map((ex, i) => (
       i !== exIdx ? ex : { ...ex, warmupDone: true }
@@ -265,14 +282,16 @@ export default function ActiveWorkout() {
     if (!workoutId || isPreview) return
     const ex = exercises[exIdx]
     const displayExercise = replacedExercises[ex.exercise.id] ?? ex.exercise
-    supabase.from('mf_workout_sets').insert({
+    const setData = {
       workout_id: workoutId,
       exercise_id: displayExercise.id,
       set_number: 0,
       weight: Math.round((ex.sets[0]?.weight ?? ex.defaultWeight ?? 0) * 0.5),
       reps: ex.sets[0]?.reps ?? ex.defaultReps,
       completed: true,
-    })
+    }
+    const { error } = await supabase.from('mf_workout_sets').insert(setData)
+    if (error) enqueuePendingSet(setData)
   }
 
   async function saveNote(exerciseId, text) {
@@ -332,18 +351,28 @@ export default function ActiveWorkout() {
     const displayExercise = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
 
     if (isPreview) return
-    supabase.from('mf_workout_sets').insert({
+    const setData = {
       workout_id: workoutId,
       exercise_id: displayExercise.id,
       set_number: setIdx + 1,
       weight: set.weight,
       reps: set.reps,
       completed: true,
-    })
+    }
+    const { error } = await supabase.from('mf_workout_sets').insert(setData)
+    if (error) enqueuePendingSet(setData)
   }
 
   async function finishWorkout(intensity) {
     if (!workoutId) return
+
+    try {
+      const pending = JSON.parse(localStorage.getItem('mf_pending_sets') || '[]')
+      if (pending.length > 0) {
+        const { error } = await supabase.from('mf_workout_sets').insert(pending)
+        if (!error) localStorage.removeItem('mf_pending_sets')
+      }
+    } catch {}
 
     const calories = Math.round(
       ({ важко: 8, нормально: 6, легко: 4 }[intensity] ?? 6) * 70 * (elapsed / 3600)
@@ -359,6 +388,7 @@ export default function ActiveWorkout() {
       })
       .eq('id', workoutId)
 
+    localStorage.removeItem('mf_current_workout')
     wakeLockRef.current?.release()
     navigate('/')
   }
@@ -536,6 +566,20 @@ export default function ActiveWorkout() {
       </div>
 
       <div className="page stack">
+        {!isOnline && !isPreview && (
+          <div style={{
+            background: 'rgba(255,181,71,0.08)',
+            border: '1px solid rgba(255,181,71,0.2)',
+            borderRadius: 12,
+            padding: '8px 14px',
+            fontSize: 12,
+            color: 'var(--warning)',
+            marginBottom: -4,
+          }}>
+            Офлайн — підходи збережуться коли з'явиться зв'язок
+          </div>
+        )}
+
         {!isPreview && (
           <section className="stack" style={{ gap: 10 }}>
             <div className="progress-strip">
