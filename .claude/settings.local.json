@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(cd /c/Users/violk/Desktop/'Minto Fit' && find . -type f -name \"*.jsx\" -o -name \"*.js\" -o -name \"*.css\" | head -30)",
+      "Read(//c/c/Users/violk/Desktop/**)",
+      "Bash(awk '/^\\\\./{print NR\": \"$0}' src/index.css)",
+      "Bash(grep -E \"^\\\\.\\(h-[0-9]|label|meta|stack|num|card|btn|field\\)$\")",
+      "Bash(awk 'BEGIN{RS=\"}\"} /^\\\\./{gsub\\(/\\\\n[[:space:]]*/, \" \"\\); print}' src/index.css)",
+      "Bash(awk 'BEGIN{RS=\"}\"} /^\\\\./{gsub\\(/\\\\n[[:space:]]*/, \" \"\\); print}' src/App.css)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\violk\\\\Desktop\\\\Minto Fit\\\\src\\\\App.css\")",
+      "PowerShell(Remove-Item \"c:\\\\Users\\\\violk\\\\Desktop\\\\Minto Fit\\\\src\\\\App.css\" -Confirm:$false)"
     ]
   }
 }

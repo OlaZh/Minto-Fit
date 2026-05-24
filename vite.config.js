@@ -21,6 +21,7 @@ export default defineConfig({
           },
           {
             urlPattern: /^https:\/\/[^/]+\.supabase\.co\//,
+            method: 'GET',
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api',

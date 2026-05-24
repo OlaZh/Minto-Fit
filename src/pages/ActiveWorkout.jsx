@@ -668,7 +668,11 @@ export default function ActiveWorkout() {
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
                     <div className="ex-machine-photo">
                       {displayExercise.machine_photo_url ? (
-                        <img src={displayExercise.machine_photo_url} alt={displayExercise.name} />
+                        <img
+                          src={displayExercise.machine_photo_url}
+                          alt={displayExercise.name}
+                          onError={e => { e.currentTarget.style.display = 'none' }}
+                        />
                       ) : (
                         <IconDumbbell size={20} style={{ color: 'var(--text-3)' }} />
                       )}
@@ -1012,7 +1016,7 @@ export default function ActiveWorkout() {
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   <div className="exercise-hero" style={{ minHeight: 180, border: 0, borderRadius: 0 }}>
                     {menuDisplayExercise?.machine_photo_url ? (
-                      <img src={menuDisplayExercise.machine_photo_url} alt={menuDisplayExercise.name} />
+                      <img src={menuDisplayExercise.machine_photo_url} alt={menuDisplayExercise.name} onError={e => { e.currentTarget.style.display = 'none' }} />
                     ) : (
                       <span>Фото</span>
                     )}

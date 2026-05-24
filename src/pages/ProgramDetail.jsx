@@ -64,9 +64,11 @@ export default function ProgramDetail() {
     if (!Object.keys(pending).length) return
     setSaving(true)
     await Promise.all(
-      Object.entries(pending).map(([peId, fields]) =>
-        supabase.from('mf_program_exercises').update(fields).eq('id', peId)
-      )
+      Object.entries(pending).map(([peId, fields]) => {
+        const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null))
+        if (!Object.keys(patch).length) return Promise.resolve()
+        return supabase.from('mf_program_exercises').update(patch).eq('id', peId)
+      })
     )
     setPending({})
     setSaving(false)
@@ -83,12 +85,14 @@ export default function ProgramDetail() {
 
   async function addExercise(ex) {
     const nextOrder = exercises.length + 1
-    const { data: row } = await supabase
+    const { data: row, error } = await supabase
       .from('mf_program_exercises')
       .insert({ program_id: id, exercise_id: ex.id, order: nextOrder, default_sets: 3, default_reps: 12, default_weight: 0 })
-      .select('id, order, default_sets, default_reps, default_weight, exercise:mf_exercises(*)')
+      .select('id, order, default_sets, default_reps, default_weight')
       .single()
-    if (row) setExercises(prev => [...prev, row])
+    if (error) { console.error('addExercise:', error.message); return }
+    const { data: fullEx } = await supabase.from('mf_exercises').select('*').eq('id', ex.id).single()
+    setExercises(prev => [...prev, { ...row, exercise: fullEx ?? ex }])
     setPickerOpen(false)
   }
 
@@ -192,7 +196,11 @@ export default function ProgramDetail() {
             <article key={exercise.id} className="program-card" style={{ overflow: 'hidden', padding: 0 }}>
               <div className="exercise-hero" style={{ aspectRatio: '16 / 8', border: 0, borderBottom: '1px solid var(--border)', borderRadius: 0 }}>
                 {exercise.machine_photo_url ? (
-                  <img src={exercise.machine_photo_url} alt={exercise.name} />
+                  <img
+                    src={exercise.machine_photo_url}
+                    alt={exercise.name}
+                    onError={e => { e.currentTarget.style.display = 'none' }}
+                  />
                 ) : (
                   <span>Фото</span>
                 )}

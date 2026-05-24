@@ -4,6 +4,16 @@ import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconTrophy, IconX } from '../components/Icons'
 
 const DAY_MS = 86400000
+
+function formatRecordDate(dateStr) {
+  if (!dateStr) return '—'
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / DAY_MS)
+  if (diff === 0) return 'Сьогодні'
+  if (diff === 1) return 'Вчора'
+  if (diff < 7) return `${diff} дн. тому`
+  if (diff < 30) return `${Math.floor(diff / 7)} тиж. тому`
+  return new Date(dateStr).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
+}
 const WEEKS = 16
 const YEAR_WEEKS = 52
 
@@ -49,7 +59,7 @@ export default function Progress() {
           .order('started_at'),
         supabase
           .from('mf_workout_sets')
-          .select('exercise_id, weight, reps, exercise:mf_exercises(name)')
+          .select('exercise_id, weight, reps, created_at, exercise:mf_exercises(name)')
           .eq('completed', true),
         supabase
           .from('mf_body_stats')
@@ -68,6 +78,7 @@ export default function Progress() {
             name: set.exercise?.name ?? '—',
             weight: set.weight,
             reps: set.reps ?? 0,
+            date: set.created_at,
           }
         }
       })
@@ -436,7 +447,7 @@ export default function Progress() {
                     <div>
                       <div style={{ fontWeight: 600 }}>{record.name}</div>
                       <div className="meta" style={{ marginTop: 2 }}>
-                        {index === 0 ? 'Сьогодні' : index === 1 ? '3 дні тому' : index === 2 ? 'Тиждень тому' : '2 тижні тому'}
+                        {formatRecordDate(record.date)}
                       </div>
                     </div>
                   </div>

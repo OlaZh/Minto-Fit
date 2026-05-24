@@ -29,6 +29,7 @@ export default function ProgramEdit() {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [allExercises, setAllExercises] = useState([])
   const [search, setSearch] = useState('')
@@ -120,53 +121,61 @@ export default function ProgramEdit() {
   async function save() {
     if (!name.trim()) return
     setSaving(true)
+    setSaveError(null)
 
-    const buildRow = (e, i, progId) => {
-      const row = {
-        program_id: progId,
-        exercise_id: e.exercise_id,
-        order: i + 1,
-      }
-      if (toNum(e.sets)     !== null) row.default_sets   = toNum(e.sets)
-      if (toNum(e.reps)     !== null) row.default_reps   = toNum(e.reps)
-      if (toNum(e.weight)   !== null) row.default_weight = toNum(e.weight)
-      return row
-    }
+    const buildRow = (e, i, progId) => ({
+      program_id: progId,
+      exercise_id: e.exercise_id,
+      order: i + 1,
+      default_sets:   toNum(e.sets),
+      default_reps:   toNum(e.reps),
+      default_weight: toNum(e.weight),
+    })
 
-    const descUpdates = exercises.map(e => {
+    const saveExerciseMeta = async (e) => {
       const patch = {}
       if (e.description.trim()) patch.description = e.description.trim()
       if (e.photo_url.trim()) patch.machine_photo_url = e.photo_url.trim()
-      return Object.keys(patch).length
-        ? supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
-        : null
-    }).filter(Boolean)
+      if (!Object.keys(patch).length) return null
+      const { error } = await supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
+      if (error) console.warn('exercise meta update failed:', error.message)
+      return error
+    }
 
-    if (isNew) {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: prog } = await supabase
-        .from('mf_programs')
-        .insert({ name: name.trim(), type, color, user_id: user.id })
-        .select()
-        .single()
+    try {
+      if (isNew) {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: prog, error: progErr } = await supabase
+          .from('mf_programs')
+          .insert({ name: name.trim(), type, color, user_id: user.id })
+          .select()
+          .single()
+        if (progErr) throw new Error(progErr.message)
 
-      if (prog) {
         const rows = exercises.map((e, i) => buildRow(e, i, prog.id))
-        await Promise.all([
-          rows.length ? supabase.from('mf_program_exercises').insert(rows) : Promise.resolve(),
-          ...descUpdates,
-        ])
+        const { error: exErr } = rows.length
+          ? await supabase.from('mf_program_exercises').insert(rows)
+          : { error: null }
+        if (exErr) throw new Error(exErr.message)
+
+        await Promise.all(exercises.map(saveExerciseMeta))
         navigate(`/programs/${prog.id}`)
+      } else {
+        const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color }).eq('id', id)
+        if (updErr) throw new Error(updErr.message)
+
+        await supabase.from('mf_program_exercises').delete().eq('program_id', id)
+        const rows = exercises.map((e, i) => buildRow(e, i, id))
+        const { error: exErr } = rows.length
+          ? await supabase.from('mf_program_exercises').insert(rows)
+          : { error: null }
+        if (exErr) throw new Error(exErr.message)
+
+        await Promise.all(exercises.map(saveExerciseMeta))
+        navigate(`/programs/${id}`)
       }
-    } else {
-      await supabase.from('mf_programs').update({ name: name.trim(), type, color }).eq('id', id)
-      await supabase.from('mf_program_exercises').delete().eq('program_id', id)
-      const rows = exercises.map((e, i) => buildRow(e, i, id))
-      await Promise.all([
-        rows.length ? supabase.from('mf_program_exercises').insert(rows) : Promise.resolve(),
-        ...descUpdates,
-      ])
-      navigate(`/programs/${id}`)
+    } catch (err) {
+      setSaveError(err.message || 'Помилка збереження')
     }
 
     setSaving(false)
@@ -363,6 +372,15 @@ export default function ProgramEdit() {
       </div>
 
       <div className="finish-bar">
+        {saveError && (
+          <div style={{
+            fontSize: 12, color: 'var(--danger)', marginBottom: 8,
+            padding: '6px 10px', background: 'rgba(255,90,95,0.08)',
+            borderRadius: 8, border: '1px solid rgba(255,90,95,0.2)',
+          }}>
+            {saveError}
+          </div>
+        )}
         <button
           type="button"
           className="btn btn-primary btn-block"
