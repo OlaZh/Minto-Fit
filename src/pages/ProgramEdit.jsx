@@ -125,10 +125,9 @@ export default function ProgramEdit() {
 
     const buildRow = (e, i, progId) => {
       const row = { program_id: progId, exercise_id: e.exercise_id, order: i + 1 }
-      if (toNum(e.sets)     !== null) row.default_sets     = toNum(e.sets)
-      if (toNum(e.reps)     !== null) row.default_reps     = toNum(e.reps)
-      if (toNum(e.weight)   !== null) row.default_weight   = toNum(e.weight)
-      if (toNum(e.duration) !== null) row.default_duration = toNum(e.duration)
+      if (toNum(e.sets)   !== null) row.default_sets   = toNum(e.sets)
+      if (toNum(e.reps)   !== null) row.default_reps   = toNum(e.reps)
+      if (toNum(e.weight) !== null) row.default_weight = toNum(e.weight)
       return row
     }
 

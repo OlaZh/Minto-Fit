@@ -88,8 +88,8 @@ export default function ProgramDetail() {
     const nextOrder = exercises.length + 1
     const { data: row, error } = await supabase
       .from('mf_program_exercises')
-      .insert({ program_id: id, exercise_id: ex.id, order: nextOrder, default_sets: 3, default_reps: 12, default_weight: 0 })
-      .select('id, order, default_sets, default_reps, default_weight')
+      .insert({ program_id: id, exercise_id: ex.id, order: nextOrder })
+      .select('id, order, default_sets, default_reps, default_weight, default_duration')
       .single()
     if (error) { console.error('addExercise:', error.message); return }
     const { data: fullEx } = await supabase.from('mf_exercises').select('*').eq('id', ex.id).single()
