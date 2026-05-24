@@ -197,7 +197,9 @@ export default function Progress() {
   const padY = 14
 
   const points = chartData.map((item, index) => {
-    const x = padX + (index / Math.max(chartData.length - 1, 1)) * (chartWidth - padX * 2)
+    const x = chartData.length === 1
+      ? chartWidth / 2
+      : padX + (index / (chartData.length - 1)) * (chartWidth - padX * 2)
     const y = chartHeight - padY - ((item.value - min) / range) * (chartHeight - padY * 2)
     return { x, y, ...item }
   })
@@ -397,7 +399,7 @@ export default function Progress() {
             )}
           </div>
 
-          {points.length > 1 ? (
+          {points.length >= 1 ? (
             <>
               <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ height: 150 }}>
                 <defs>
@@ -443,15 +445,17 @@ export default function Progress() {
                   </>
                 )}
 
-                <path d={areaD} fill="url(#body-area)" />
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                {points.length > 1 && <path d={areaD} fill="url(#body-area)" />}
+                {points.length > 1 && (
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
                 {points.map((point, index) => (
                   <circle key={index} cx={point.x} cy={point.y} r={index === points.length - 1 ? '4.5' : '3'} fill={index === points.length - 1 ? 'var(--accent)' : '#b7b8bf'} />
                 ))}
