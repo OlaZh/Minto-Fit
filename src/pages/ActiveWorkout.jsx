@@ -344,6 +344,12 @@ export default function ActiveWorkout() {
     setNoteEdit(null)
   }
 
+  function toggleWarmup(exIdx) {
+    setExercises(prev => prev.map((ex, i) =>
+      i !== exIdx ? ex : { ...ex, hasWarmup: !ex.hasWarmup, warmupDone: false }
+    ))
+  }
+
   function addSet(exIdx) {
     setExercises(prev => prev.map((exercise, i) => {
       if (i !== exIdx) return exercise
@@ -946,13 +952,26 @@ export default function ActiveWorkout() {
                     className="ex-action-btn"
                     onClick={() => setNoteEdit({ exerciseId: displayExercise.id, text: displayExercise.personal_note ?? '' })}
                   >
-                    <IconNote size={15} /> Нотатки
+                    <IconNote size={15} />
                     {!!displayExercise.personal_note && (
                       <span style={{
                         width: 6, height: 6, borderRadius: '50%',
                         background: 'var(--accent)', flexShrink: 0,
                       }} />
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    className="ex-action-btn"
+                    data-active={exercise.hasWarmup ? '1' : '0'}
+                    style={exercise.hasWarmup ? {
+                      background: 'rgba(198,255,61,0.12)',
+                      borderColor: 'rgba(198,255,61,0.4)',
+                      color: 'var(--accent)',
+                    } : {}}
+                    onClick={() => toggleWarmup(exerciseIndex)}
+                  >
+                    Р
                   </button>
                   <button
                     type="button"
