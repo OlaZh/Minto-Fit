@@ -607,7 +607,7 @@ export default function ActiveWorkout() {
 
   return (
     <div className="screen screen--no-nav" style={{ overflow: 'hidden', paddingBottom: 0 }}>
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', minHeight: 0, paddingBottom: rest !== null ? 90 : 0 }}>
       <div className="topbar" style={{ paddingBottom: 0 }}>
         <button
           type="button"
@@ -738,30 +738,6 @@ export default function ActiveWorkout() {
           </button>
         </div>}
 
-        {rest !== null && (
-          <div className="timer-bar" style={{ '--p': `${Math.max(0, 100 - (rest / restTotalRef.current) * 100)}%` }}>
-            <div>
-              <div className="label" style={{ color: 'rgba(198,255,61,0.85)' }}>Відпочинок</div>
-              <div className="num" style={{ fontSize: 24, fontWeight: 600, color: 'var(--accent)' }}>
-                {fmtTime(rest)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button type="button" className="btn btn-dark btn-sm" onClick={() => {
-                restStartedAtRef.current = Date.now() - ((restTotalRef.current - (rest ?? 0) - 15) * 1000)
-                setRest(value => (value ?? 0) + 15)
-              }}>
-                +15с
-              </button>
-              <button type="button" className="btn btn-dark btn-sm" onClick={() => {
-                restStartedAtRef.current = null
-                setRest(null)
-              }}>
-                Пропустити
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="stack" style={{ gap: 12 }}>
           {exercises.map((exercise, exerciseIndex) => {
@@ -1283,6 +1259,44 @@ export default function ActiveWorkout() {
         </div>
       )}
 
+      {rest !== null && (
+        <div
+          className="timer-bar"
+          style={{
+            '--p': `${Math.max(0, 100 - (rest / restTotalRef.current) * 100)}%`,
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            borderRadius: '16px 16px 0 0',
+            margin: 0,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
+        >
+          <div>
+            <div className="label" style={{ color: 'rgba(198,255,61,0.85)' }}>Відпочинок</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 600, color: 'var(--accent)' }}>
+              {fmtTime(rest)}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="btn btn-dark btn-sm" onClick={() => {
+              restStartedAtRef.current = Date.now() - ((restTotalRef.current - (rest ?? 0) - 15) * 1000)
+              setRest(value => (value ?? 0) + 15)
+            }}>
+              +15с
+            </button>
+            <button type="button" className="btn btn-dark btn-sm" onClick={() => {
+              restStartedAtRef.current = null
+              setRest(null)
+            }}>
+              Пропустити
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
