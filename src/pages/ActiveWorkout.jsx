@@ -185,7 +185,8 @@ export default function ActiveWorkout() {
           const localId = (saved?.programId === programId) ? saved.id : crypto.randomUUID()
           setWorkoutId(localId)
           localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId }))
-          supabase.from('mf_workouts').insert({ id: localId, user_id: uid, program_id: programId })
+          const { error: insertError } = await supabase.from('mf_workouts').insert({ id: localId, user_id: uid, program_id: programId, started_at: new Date().toISOString() })
+          if (insertError) console.error('mf_workouts insert error:', insertError)
         }
       }
 
@@ -505,7 +506,7 @@ export default function ActiveWorkout() {
               <div>
                 <div className="label">Тренування завершено</div>
               </div>
-              <button type="button" className="icon-btn" onClick={() => navigate('/')}><IconX size={18} /></button>
+              <button type="button" className="icon-btn" onClick={() => finishWorkout(selectedMood)}><IconX size={18} /></button>
             </div>
 
             <div className="summary-check" style={{ marginTop: 8 }}><IconCheck size={56} /></div>
