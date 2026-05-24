@@ -3,7 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { IconArrowLeft, IconPlus, IconX, IconCheck, getProgramIcon } from '../components/Icons'
 
-const COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899']
+const COLORS = [
+  '#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899',
+  '#f43f5e','#fb923c','#4ade80','#2dd4bf','#38bdf8','#6366f1','#a855f7','#fb7185','#facc15','#94a3b8',
+]
+
+const ACTIVITY_TYPES = [
+  { key: 'силове',         label: 'Силове тренування' },
+  { key: 'кардіо',         label: 'Кардіо' },
+  { key: 'hiit',           label: 'HIIT / Кросфіт' },
+  { key: 'функціональне',  label: 'Функціональне' },
+  { key: 'йога',           label: 'Йога' },
+  { key: 'пілатес',        label: 'Пілатес' },
+  { key: 'ходьба',         label: 'Ходьба' },
+  { key: 'розтяжка',       label: 'Розтяжка' },
+]
 
 const NUM_FIELDS = [
   { key: 'sets',   label: 'Підходи',    placeholder: '—' },
@@ -24,7 +38,10 @@ export default function ProgramEdit() {
 
   const [name, setName] = useState('')
   const [type, setType] = useState('основна')
-  const [color, setColor] = useState('#3b82f6')
+  const [color, setColor] = useState('')
+  const [usedColors, setUsedColors] = useState([])
+  const [hasCardio, setHasCardio] = useState(true)
+  const [activityType, setActivityType] = useState('силове')
   const [existingGroups, setExistingGroups] = useState([])
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(!isNew)
@@ -36,11 +53,15 @@ export default function ProgramEdit() {
   const [creatingNew, setCreatingNew] = useState(false)
 
   useEffect(() => {
-    supabase.from('mf_programs').select('type').then(({ data }) => {
+    supabase.from('mf_programs').select('type, color, id').then(({ data }) => {
       const unique = [...new Set((data ?? []).map(p => p.type).filter(Boolean))]
       setExistingGroups(unique)
+      const taken = (data ?? [])
+        .filter(p => p.color && p.id !== id)
+        .map(p => p.color)
+      setUsedColors(taken)
     })
-  }, [])
+  }, [id])
 
   useEffect(() => {
     if (!isNew) {
@@ -54,7 +75,9 @@ export default function ProgramEdit() {
         if (prog) {
           setName(prog.name ?? '')
           setType(prog.type ?? 'основна')
-          setColor(prog.color ?? '#3b82f6')
+          setColor(prog.color ?? '')
+          setHasCardio(prog.has_cardio ?? true)
+          setActivityType(prog.activity_type ?? 'силове')
         }
         setExercises((exs ?? []).map(e => ({
           exercise_id: e.exercise.id,
@@ -119,7 +142,7 @@ export default function ProgramEdit() {
   }
 
   async function save() {
-    if (!name.trim()) return
+    if (!name.trim() || !color) return
     setSaving(true)
     setSaveError(null)
 
@@ -146,7 +169,7 @@ export default function ProgramEdit() {
         const { data: { user } } = await supabase.auth.getUser()
         const { data: prog, error: progErr } = await supabase
           .from('mf_programs')
-          .insert({ name: name.trim(), type, color, user_id: user.id })
+          .insert({ name: name.trim(), type, color, has_cardio: hasCardio, activity_type: activityType, user_id: user.id })
           .select()
           .single()
         if (progErr) throw new Error(progErr.message)
@@ -160,7 +183,7 @@ export default function ProgramEdit() {
         await Promise.all(exercises.map(saveExerciseMeta))
         navigate(`/programs/${prog.id}`)
       } else {
-        const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color }).eq('id', id)
+        const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color, has_cardio: hasCardio, activity_type: activityType }).eq('id', id)
         if (updErr) throw new Error(updErr.message)
 
         await supabase.from('mf_program_exercises').delete().eq('program_id', id)
@@ -253,26 +276,86 @@ export default function ProgramEdit() {
             <div className="stack" style={{ gap: 6 }}>
               <div className="label">Колір</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {COLORS.map(c => (
+                {COLORS.map(c => {
+                  const taken = usedColors.includes(c)
+                  const selected = color === c
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={taken}
+                      onClick={() => !taken && setColor(c)}
+                      style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        background: c, border: 'none',
+                        cursor: taken ? 'default' : 'pointer',
+                        outline: selected ? `3px solid ${c}` : 'none',
+                        outlineOffset: 2,
+                        position: 'relative',
+                        opacity: taken ? 0.6 : 1,
+                      }}
+                    >
+                      {taken && (
+                        <span style={{
+                          position: 'absolute', inset: 0, borderRadius: '50%',
+                          background: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.45) 3px, rgba(0,0,0,0.45) 4px)',
+                        }} />
+                      )}
+                      {selected && (
+                        <IconCheck size={14} style={{ color: '#fff', position: 'absolute', inset: 0, margin: 'auto' }} />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+              {!color && <div className="meta" style={{ color: 'var(--warning)' }}>Обери колір для програми</div>}
+            </div>
+
+            <div className="stack" style={{ gap: 6 }}>
+              <div className="label">Тип активності</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {ACTIVITY_TYPES.map(a => (
                   <button
-                    key={c}
+                    key={a.key}
                     type="button"
-                    onClick={() => setColor(c)}
-                    style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: c, border: 'none', cursor: 'pointer',
-                      outline: color === c ? `3px solid ${c}` : 'none',
-                      outlineOffset: 2,
-                      position: 'relative',
-                    }}
+                    className="pill-btn"
+                    data-active={activityType === a.key ? '1' : '0'}
+                    onClick={() => setActivityType(a.key)}
+                    style={{ fontSize: 12 }}
                   >
-                    {color === c && (
-                      <IconCheck size={14} style={{ color: '#fff', position: 'absolute', inset: 0, margin: 'auto' }} />
-                    )}
+                    {a.label}
                   </button>
                 ))}
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setHasCardio(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 12,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                cursor: 'pointer', width: '100%', textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>Кардіо розминка</div>
+                <div className="meta" style={{ marginTop: 2 }}>Блок на початку тренування</div>
+              </div>
+              <div style={{
+                width: 42, height: 24, borderRadius: 12, flexShrink: 0,
+                background: hasCardio ? 'var(--accent)' : 'var(--surface-3)',
+                position: 'relative', transition: 'background 0.2s',
+              }}>
+                <div style={{
+                  position: 'absolute', top: 3, left: hasCardio ? 20 : 3,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: hasCardio ? 'var(--bg)' : 'var(--text-3)',
+                  transition: 'left 0.2s',
+                }} />
+              </div>
+            </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
               <div className="prog-icon" style={{ background: `${color}18` }}>

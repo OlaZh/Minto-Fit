@@ -6,6 +6,17 @@ import {
   IconCamera, IconPlay, IconNote, IconRotate, IconTired, IconFlex, IconLeaf,
 } from '../components/Icons'
 
+const MET_TABLE = {
+  силове:        { легко: 3,   нормально: 5,   важко: 6  },
+  кардіо:        { легко: 6,   нормально: 8,   важко: 10 },
+  hiit:          { легко: 7,   нормально: 9,   важко: 12 },
+  функціональне: { легко: 4,   нормально: 5.5, важко: 7  },
+  йога:          { легко: 2,   нормально: 3,   важко: 4  },
+  пілатес:       { легко: 2.5, нормально: 3.5, важко: 4.5},
+  ходьба:        { легко: 3,   нормально: 4,   важко: 5  },
+  розтяжка:      { легко: 1.5, нормально: 2,   важко: 2.5},
+}
+
 function getLS(key, fallback) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v) } catch { return fallback }
 }
@@ -41,6 +52,7 @@ export default function ActiveWorkout() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [replacedExercises, setReplacedExercises] = useState({})
   const [originalSets, setOriginalSets] = useState({})
+  const [bodyWeight, setBodyWeight] = useState(70)
   const [menuExerciseId, setMenuExerciseId] = useState(null)
   const [menuSection, setMenuSection] = useState(null)
   const [editingCell, setEditingCell] = useState(null)
@@ -66,7 +78,7 @@ export default function ActiveWorkout() {
       const { data: user } = await supabase.auth.getUser()
       const uid = user.user.id
 
-      const [{ data: prog }, { data: exRows }, { data: lastWorkout }] = await Promise.all([
+      const [{ data: prog }, { data: exRows }, { data: lastWorkout }, { data: lastStat }] = await Promise.all([
         supabase.from('mf_programs').select('*').eq('id', programId).single(),
         supabase
           .from('mf_program_exercises')
@@ -82,7 +94,17 @@ export default function ActiveWorkout() {
           .order('finished_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from('mf_body_stats')
+          .select('weight_kg')
+          .eq('user_id', uid)
+          .not('weight_kg', 'is', null)
+          .order('recorded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ])
+
+      if (lastStat?.weight_kg) setBodyWeight(lastStat.weight_kg)
 
       setProgram(prog)
 
@@ -422,9 +444,7 @@ export default function ActiveWorkout() {
       }
     } catch {}
 
-    const calories = Math.round(
-      ({ важко: 8, нормально: 6, легко: 4 }[intensity] ?? 6) * 70 * (elapsed / 3600)
-    )
+    const calories = burnedCalories
 
     await supabase
       .from('mf_workouts')
@@ -468,7 +488,8 @@ export default function ActiveWorkout() {
     (sum, exercise) => sum + exercise.sets.filter(set => set.completed).reduce((acc, set) => acc + set.weight * set.reps, 0),
     0,
   )
-  const burnedCalories = Math.round((elapsed / 60) * 5.4)
+  const metValues = MET_TABLE[program?.activity_type] ?? MET_TABLE.силове
+  const burnedCalories = Math.round((metValues[selectedMood] ?? metValues.нормально) * bodyWeight * (elapsed / 3600))
   const menuExercise = exercises.find(exercise => exercise.exercise.id === menuExerciseId)
   const menuDisplayExercise = menuExercise
     ? (replacedExercises[menuExercise.exercise.id] ?? menuExercise.exercise)
@@ -672,7 +693,7 @@ export default function ActiveWorkout() {
           </section>
         )}
 
-        <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
+        {program?.has_cardio !== false && <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
             <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}><IconFlame size={20} /></div>
             <div style={{ flex: 1 }}>
@@ -713,7 +734,7 @@ export default function ActiveWorkout() {
           >
             {cardio.done ? <IconCheck size={18} /> : ''}
           </button>
-        </div>
+        </div>}
 
         {rest !== null && (
           <div className="timer-bar" style={{ '--p': `${Math.max(0, 100 - (rest / restTotalRef.current) * 100)}%` }}>
