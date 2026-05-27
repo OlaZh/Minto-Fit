@@ -767,6 +767,11 @@ export default function ActiveWorkout() {
                         <div className="ex-name">{displayExercise.name}</div>
                         {isReplaced && <span className="inline-badge">заміна</span>}
                       </div>
+                      {displayExercise.about && (
+                        <div className="ex-note" style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>
+                          {displayExercise.about}
+                        </div>
+                      )}
                       <div className="ex-note">{displayExercise.muscle_group ?? 'Тренажер'}</div>
                       {displayExercise.personal_note && (
                         <div className="ex-note" style={{ color: 'var(--text-4)' }}>

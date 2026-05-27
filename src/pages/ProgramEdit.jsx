@@ -69,7 +69,7 @@ export default function ProgramEdit() {
       Promise.all([
         supabase.from('mf_programs').select('*').eq('id', id).single(),
         supabase.from('mf_program_exercises')
-          .select('*, exercise:mf_exercises(id,name,description,machine_photo_url)')
+          .select('*, exercise:mf_exercises(id,name,description,about,machine_photo_url)')
           .eq('program_id', id)
           .order('order'),
       ]).then(([{ data: prog }, { data: exs }]) => {
@@ -89,6 +89,7 @@ export default function ProgramEdit() {
           weight:   e.default_weight != null ? String(e.default_weight) : '',
           duration: e.default_duration != null ? String(e.default_duration) : '',
           description: e.exercise.description ?? '',
+          about: e.exercise.about ?? '',
           photo_url: e.exercise.machine_photo_url ?? '',
         })))
         setLoading(false)
@@ -112,6 +113,7 @@ export default function ProgramEdit() {
         name: ex.name,
         sets: '', reps: '', weight: '', duration: '',
         description: ex.description ?? '',
+        about: ex.about ?? '',
         photo_url: ex.machine_photo_url ?? '',
       }])
     }
@@ -159,6 +161,7 @@ export default function ProgramEdit() {
     const saveExerciseMeta = async (e) => {
       const patch = {}
       if (e.description.trim()) patch.description = e.description.trim()
+      if (e.about.trim()) patch.about = e.about.trim()
       if (e.photo_url.trim()) patch.machine_photo_url = e.photo_url.trim()
       if (!Object.keys(patch).length) return null
       const { error } = await supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
@@ -425,6 +428,18 @@ export default function ProgramEdit() {
                     onError={e => { e.currentTarget.style.display = 'none' }}
                   />
                 )}
+              </div>
+
+              <div className="stack" style={{ gap: 4 }}>
+                <div className="meta" style={{ fontSize: 11 }}>Короткий опис (під назвою)</div>
+                <textarea
+                  value={ex.about}
+                  onChange={e => updateField(idx, 'about', e.target.value)}
+                  placeholder="Чому ця вправа, на що впливає..."
+                  rows={2}
+                  className="textarea-field"
+                  style={{ fontSize: 13 }}
+                />
               </div>
 
               <div className="stack" style={{ gap: 4 }}>

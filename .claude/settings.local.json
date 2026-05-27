@@ -9,7 +9,8 @@
       "Bash(awk 'BEGIN{RS=\"}\"} /^\\\\./{gsub\\(/\\\\n[[:space:]]*/, \" \"\\); print}' src/index.css)",
       "Bash(awk 'BEGIN{RS=\"}\"} /^\\\\./{gsub\\(/\\\\n[[:space:]]*/, \" \"\\); print}' src/App.css)",
       "Bash(Remove-Item \"c:\\\\Users\\\\violk\\\\Desktop\\\\Minto Fit\\\\src\\\\App.css\")",
-      "PowerShell(Remove-Item \"c:\\\\Users\\\\violk\\\\Desktop\\\\Minto Fit\\\\src\\\\App.css\" -Confirm:$false)"
+      "PowerShell(Remove-Item \"c:\\\\Users\\\\violk\\\\Desktop\\\\Minto Fit\\\\src\\\\App.css\" -Confirm:$false)",
+      "Bash(xargs grep -l \"description\\\\|technique\\\\|info\")"
     ]
   }
 }

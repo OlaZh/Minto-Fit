@@ -210,7 +210,12 @@ export default function ProgramDetail() {
               <div className="stack" style={{ gap: 12, padding: 18 }}>
                 {/* Name + actions */}
                 <div className="card-row" style={{ alignItems: 'flex-start' }}>
-                  <div className="h-3" style={{ flex: 1 }}>{exercise.name}</div>
+                  <div style={{ flex: 1 }}>
+                    <div className="h-3">{exercise.name}</div>
+                    {exercise.about && (
+                      <div className="meta" style={{ marginTop: 4, fontStyle: 'italic', color: 'var(--text-3)' }}>{exercise.about}</div>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {exercise.youtube_url && (
                       <a href={exercise.youtube_url} target="_blank" rel="noreferrer" className="icon-btn">
