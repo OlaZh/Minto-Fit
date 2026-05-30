@@ -45,6 +45,7 @@ export default function Progress() {
   const [otherField, setOtherField] = useState('waist')
   const [profileOpen, setProfileOpen] = useState(false)
   const [trackerOpen, setTrackerOpen] = useState(false)
+  const [selectedDay, setSelectedDay] = useState(null)
   const yearScrollRef = useRef(null)
 
   useEffect(() => {
@@ -126,10 +127,10 @@ export default function Progress() {
     return count
   })()
 
-  const workoutByDate = {}
+  const workoutByDay = {}
   workouts.forEach(workout => {
     const key = new Date(workout.started_at).toDateString()
-    workoutByDate[key] = workout.program?.color ?? '#52525b'
+    workoutByDay[key] = { color: workout.program?.color ?? '#52525b', name: workout.program?.name ?? 'Тренування' }
   })
 
   const today = new Date()
@@ -164,7 +165,9 @@ export default function Progress() {
 
   useEffect(() => {
     if (trackerOpen && yearScrollRef.current) {
-      yearScrollRef.current.scrollLeft = yearScrollRef.current.scrollWidth
+      setTimeout(() => {
+        yearScrollRef.current.scrollTop = yearScrollRef.current.scrollHeight
+      }, 0)
     }
   }, [trackerOpen])
 
@@ -297,7 +300,8 @@ export default function Progress() {
                   if (!day) return <div key={wi} className="tracker-cell" style={{ opacity: 0, border: 'none' }} />
                   const isFuture = day > today
                   const isToday = day.toDateString() === today.toDateString()
-                  const color = workoutByDate[day.toDateString()]
+                  const info = workoutByDay[day.toDateString()]
+                  const color = info?.color
                   return (
                     <div
                       key={wi}
@@ -533,40 +537,45 @@ export default function Progress() {
             </button>
           </div>
 
-          <div ref={yearScrollRef} style={{ overflowX: 'auto', padding: '20px 24px', flex: 1, display: 'flex', alignItems: 'center' }}>
+          <div ref={yearScrollRef} style={{ overflowY: 'auto', padding: '8px 16px 24px', flex: 1 }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: `14px repeat(${yearWeeks.length}, minmax(11px, 1fr))`,
+              gridTemplateColumns: `28px repeat(7, 1fr)`,
               gap: '3px',
-              minWidth: '100%',
-              alignItems: 'center',
             }}>
+              {/* Header row: empty + day labels */}
               <div />
-              {yearWeeks.map((week, wi) => (
-                <div key={`m${wi}`} style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', whiteSpace: 'nowrap', paddingBottom: 2, alignSelf: 'end' }}>
-                  {wi === 0 || week[0].getMonth() !== yearWeeks[wi - 1][0].getMonth()
-                    ? week[0].toLocaleDateString('uk-UA', { month: 'short' }).replace(/\./g, '')
-                    : null}
+              {DAY_ORDER.map(dayIdx => (
+                <div key={dayIdx} style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center', paddingBottom: 6 }}>
+                  {DAY_LABEL[dayIdx]}
                 </div>
               ))}
-              {DAY_ORDER.map((dayIdx, rowIdx) => (
-                <Fragment key={dayIdx}>
-                  <div style={{ width: '100%', aspectRatio: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontSize: 9, color: 'var(--text-3)', lineHeight: 1 }}>
-                    {rowIdx % 2 === 0 ? DAY_LABEL[dayIdx] : null}
+
+              {/* Week rows */}
+              {yearWeeks.map((week, wi) => (
+                <Fragment key={wi}>
+                  <div style={{ fontSize: 9, color: 'var(--text-3)', display: 'flex', alignItems: 'center', paddingRight: 4, whiteSpace: 'nowrap' }}>
+                    {wi === 0 || week[0].getMonth() !== yearWeeks[wi - 1][0].getMonth()
+                      ? week[0].toLocaleDateString('uk-UA', { month: 'short' }).replace(/\./g, '')
+                      : null}
                   </div>
-                  {yearWeeks.map((week, wi) => {
+                  {DAY_ORDER.map(dayIdx => {
                     const day = week[dayIdx]
-                    if (!day) return <div key={wi} style={{ width: '100%', aspectRatio: 1 }} />
-                    const color = workoutByDate[day.toDateString()]
+                    if (!day) return <div key={dayIdx} style={{ aspectRatio: 1, borderRadius: 3 }} />
+                    const info = workoutByDay[day.toDateString()]
+                    const color = info?.color
+                    const isFuture = day > today
                     return (
                       <div
-                        key={wi}
-                        title={day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                        key={dayIdx}
+                        onClick={() => info && setSelectedDay({ date: day, ...info })}
                         style={{
-                          width: '100%', aspectRatio: 1, borderRadius: 3,
+                          aspectRatio: 1, borderRadius: 3,
                           border: color ? 'none' : '1px solid var(--border)',
-                          background: color ?? 'var(--surface-2)',
-                          boxShadow: color ? `0 0 6px ${color}66` : 'none',
+                          background: color ?? (isFuture ? 'transparent' : 'var(--surface-2)'),
+                          boxShadow: color ? `0 0 8px ${color}88` : 'none',
+                          opacity: isFuture ? 0.25 : 1,
+                          cursor: color ? 'pointer' : 'default',
                         }}
                       />
                     )
@@ -584,6 +593,25 @@ export default function Progress() {
             <div className="tracker-legend-item">
               <div className="tracker-legend-dot" style={{ background: '#52525b' }} />
               Тренування
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedDay && (
+        <div
+          onClick={() => setSelectedDay(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'flex-end', background: 'rgba(0,0,0,0.45)' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', padding: '24px 24px 40px', width: '100%', borderRadius: '16px 16px 0 0', border: '1px solid var(--border)' }}
+          >
+            <div className="label" style={{ marginBottom: 8 }}>
+              {selectedDay.date.toLocaleDateString('uk-UA', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </div>
+            <div className="h-3" style={{ color: selectedDay.color }}>
+              {selectedDay.name}
             </div>
           </div>
         </div>

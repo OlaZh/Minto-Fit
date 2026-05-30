@@ -84,6 +84,36 @@ export default function Workout() {
     const { data: user } = await supabase.auth.getUser()
     const uid = user.user.id
 
+    // Retry pending workout finish (if previous finishWorkout failed due to network)
+    const pendingFinish = JSON.parse(localStorage.getItem('mf_pending_finish') || 'null')
+    if (pendingFinish?.id) {
+      const { error } = await supabase.from('mf_workouts').update({
+        finished_at: pendingFinish.finished_at,
+        duration_minutes: pendingFinish.duration_minutes,
+        intensity: pendingFinish.intensity,
+        calories_burned: pendingFinish.calories_burned,
+      }).eq('id', pendingFinish.id).is('finished_at', null)
+      if (!error) localStorage.removeItem('mf_pending_finish')
+    }
+
+    // Auto-finish abandoned workout (user navigated away without pressing "На головну")
+    const abandoned = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
+    if (abandoned?.id && abandoned?.startedAt) {
+      const durationMs = Date.now() - new Date(abandoned.startedAt).getTime()
+      const durationMinutes = Math.round(durationMs / 60000)
+      if (durationMinutes >= 2) {
+        const { error } = await supabase.from('mf_workouts').update({
+          finished_at: new Date().toISOString(),
+          duration_minutes: durationMinutes,
+          intensity: 'нормально',
+          calories_burned: null,
+        }).eq('id', abandoned.id).is('finished_at', null)
+        if (!error) localStorage.removeItem('mf_current_workout')
+      } else {
+        localStorage.removeItem('mf_current_workout')
+      }
+    }
+
     const eightWeeksAgo = new Date(weekDays[0])
     eightWeeksAgo.setDate(weekDays[0].getDate() - 7 * 7)
 

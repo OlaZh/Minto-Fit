@@ -169,7 +169,7 @@ export default function ActiveWorkout() {
       if (!isPreview) {
         const { data: existingWorkout } = await supabase
           .from('mf_workouts')
-          .select('id')
+          .select('id, started_at')
           .eq('user_id', uid)
           .eq('program_id', programId)
           .is('finished_at', null)
@@ -179,13 +179,14 @@ export default function ActiveWorkout() {
 
         if (existingWorkout) {
           setWorkoutId(existingWorkout.id)
-          localStorage.setItem('mf_current_workout', JSON.stringify({ id: existingWorkout.id, programId }))
+          localStorage.setItem('mf_current_workout', JSON.stringify({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at }))
         } else {
           const saved = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
           const localId = (saved?.programId === programId) ? saved.id : crypto.randomUUID()
+          const startedAt = new Date().toISOString()
           setWorkoutId(localId)
-          localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId }))
-          const { error: insertError } = await supabase.from('mf_workouts').insert({ id: localId, user_id: uid, program_id: programId, started_at: new Date().toISOString() })
+          localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId, startedAt }))
+          const { error: insertError } = await supabase.from('mf_workouts').insert({ id: localId, user_id: uid, program_id: programId, started_at: startedAt })
           if (insertError) console.error('mf_workouts insert error:', insertError)
         }
       }
@@ -447,16 +448,26 @@ export default function ActiveWorkout() {
     } catch {}
 
     const calories = burnedCalories
+    const finishData = {
+      id: workoutId,
+      finished_at: new Date().toISOString(),
+      duration_minutes: Math.round(elapsed / 60),
+      intensity,
+      calories_burned: calories,
+    }
+    localStorage.setItem('mf_pending_finish', JSON.stringify(finishData))
 
-    await supabase
+    const { error } = await supabase
       .from('mf_workouts')
       .update({
-        finished_at: new Date().toISOString(),
-        duration_minutes: Math.round(elapsed / 60),
+        finished_at: finishData.finished_at,
+        duration_minutes: finishData.duration_minutes,
         intensity,
         calories_burned: calories,
       })
       .eq('id', workoutId)
+
+    if (!error) localStorage.removeItem('mf_pending_finish')
 
     localStorage.removeItem('mf_current_workout')
     wakeLockRef.current?.release()
@@ -613,7 +624,10 @@ export default function ActiveWorkout() {
           type="button"
           onClick={() => {
             if (isPreview) { navigate(-1); return }
-            if (confirm('Скасувати тренування?')) navigate('/')
+            if (confirm('Скасувати тренування?')) {
+              localStorage.removeItem('mf_current_workout')
+              navigate('/')
+            }
           }}
           className="icon-btn"
           aria-label="Назад"
