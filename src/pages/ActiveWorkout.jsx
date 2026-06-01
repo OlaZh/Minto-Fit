@@ -27,6 +27,10 @@ function fmtTime(seconds) {
   return `${m}:${s}`
 }
 
+function nowMs() {
+  return new Date().getTime()
+}
+
 function formatProgramTitle(name = '') {
   return name
     .replace(/\s+—\s+/g, ' · ')
@@ -44,6 +48,7 @@ export default function ActiveWorkout() {
   const [workoutId, setWorkoutId] = useState(null)
   const [elapsed, setElapsed] = useState(0)
   const [rest, setRest] = useState(null)
+  const [restTotal, setRestTotal] = useState(() => getLS('mf_rest_seconds', 90))
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [selectedMood, setSelectedMood] = useState('нормально')
@@ -65,9 +70,32 @@ export default function ActiveWorkout() {
   const startedAtRef = useRef(null)
   const restRef = useRef(null)
   const restStartedAtRef = useRef(null)
-  const restTotalRef = useRef(getLS('mf_rest_seconds', 90))
 
   const isPreview = !!window.history.state?.usr?.preview
+
+  function playBeep() {
+    try {
+      const ctx = new AudioContext()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 880
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.6)
+    } catch {
+      /* ignore audio playback errors */
+    }
+  }
+
+  function startRestTimer(seconds, startedAt = nowMs()) {
+    setRestTotal(seconds)
+    restStartedAtRef.current = startedAt
+    setRestMissedSecs(null)
+    setRest(seconds)
+  }
 
   useEffect(() => {
     if (!window.history.state?.usr?.fromApp) {
@@ -195,7 +223,7 @@ export default function ActiveWorkout() {
     }
 
     load()
-  }, [programId])
+  }, [isPreview, navigate, programId])
 
   useEffect(() => {
     if (!getLS('mf_wake_lock_enabled', true)) return
@@ -205,7 +233,9 @@ export default function ActiveWorkout() {
         if ('wakeLock' in navigator) {
           wakeLockRef.current = await navigator.wakeLock.request('screen')
         }
-      } catch {}
+      } catch {
+        /* wake lock is optional */
+      }
     }
 
     acquire()
@@ -224,7 +254,7 @@ export default function ActiveWorkout() {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       if (restStartedAtRef.current === null) return
-      const remaining = restTotalRef.current - Math.floor((Date.now() - restStartedAtRef.current) / 1000)
+      const remaining = restTotal - Math.floor((nowMs() - restStartedAtRef.current) / 1000)
       if (remaining <= 0) {
         setRestMissedSecs(Math.abs(remaining))
         setRest(null)
@@ -233,7 +263,7 @@ export default function ActiveWorkout() {
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [])
+  }, [restTotal])
 
   useEffect(() => {
     const up = () => setIsOnline(true)
@@ -245,17 +275,17 @@ export default function ActiveWorkout() {
 
   useEffect(() => {
     if (loading || isPreview) return
-    const saved = getLS('mf_workout_started_at', null)
-    startedAtRef.current = saved ?? Date.now()
-    if (!saved) localStorage.setItem('mf_workout_started_at', JSON.stringify(startedAtRef.current))
+    const savedWorkout = getLS('mf_current_workout', null)
+    startedAtRef.current = savedWorkout?.programId === programId && savedWorkout?.startedAt
+      ? new Date(savedWorkout.startedAt).getTime()
+      : nowMs()
     elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000))
+      setElapsed(Math.floor((nowMs() - startedAtRef.current) / 1000))
     }, 1000)
     return () => {
       clearInterval(elapsedRef.current)
-      localStorage.removeItem('mf_workout_started_at')
     }
-  }, [loading])
+  }, [isPreview, loading, programId])
 
   useEffect(() => {
     if (rest === null) {
@@ -264,11 +294,11 @@ export default function ActiveWorkout() {
     }
 
     if (restStartedAtRef.current === null) {
-      restStartedAtRef.current = Date.now()
+      restStartedAtRef.current = nowMs()
     }
 
     const tick = () => {
-      const remaining = restTotalRef.current - Math.floor((Date.now() - restStartedAtRef.current) / 1000)
+      const remaining = restTotal - Math.floor((nowMs() - restStartedAtRef.current) / 1000)
       if (remaining <= 0) {
         if (getLS('mf_sound_enabled', true)) playBeep()
         if (getLS('mf_vibration_enabled', true) && navigator.vibrate) navigator.vibrate([300, 100, 300])
@@ -280,22 +310,7 @@ export default function ActiveWorkout() {
 
     restRef.current = setTimeout(tick, 1000)
     return () => clearTimeout(restRef.current)
-  }, [rest])
-
-  function playBeep() {
-    try {
-      const ctx = new AudioContext()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.frequency.value = 880
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
-      osc.start()
-      osc.stop(ctx.currentTime + 0.6)
-    } catch {}
-  }
+  }, [rest, restTotal])
 
   function updateSet(exIdx, setIdx, field, value) {
     setExercises(prev => prev.map((exercise, i) => (
@@ -310,16 +325,6 @@ export default function ActiveWorkout() {
     )))
   }
 
-  function adjustWeight(exIdx, setIdx, delta) {
-    const value = exercises[exIdx].sets[setIdx].weight
-    updateSet(exIdx, setIdx, 'weight', Math.max(0, +(value + delta).toFixed(1)))
-  }
-
-  function adjustReps(exIdx, setIdx, delta) {
-    const value = exercises[exIdx].sets[setIdx].reps
-    updateSet(exIdx, setIdx, 'reps', Math.max(1, value + delta))
-  }
-
   function removeLastSet(exIdx) {
     setExercises(prev => prev.map((exercise, i) => {
       if (i !== exIdx || exercise.sets.length <= 1) return exercise
@@ -332,7 +337,9 @@ export default function ActiveWorkout() {
       const q = JSON.parse(localStorage.getItem('mf_pending_sets') || '[]')
       q.push(data)
       localStorage.setItem('mf_pending_sets', JSON.stringify(q))
-    } catch {}
+    } catch {
+      /* ignore offline queue write errors */
+    }
   }
 
   async function completeWarmup(exIdx) {
@@ -340,10 +347,7 @@ export default function ActiveWorkout() {
       i !== exIdx ? ex : { ...ex, warmupDone: true }
     )))
     const restSecs = getLS('mf_rest_seconds', 90)
-    restTotalRef.current = restSecs
-    restStartedAtRef.current = Date.now()
-    setRestMissedSecs(null)
-    setRest(restSecs)
+    startRestTimer(restSecs)
     if (!workoutId || isPreview) return
     const ex = exercises[exIdx]
     const displayExercise = replacedExercises[ex.exercise.id] ?? ex.exercise
@@ -414,10 +418,7 @@ export default function ActiveWorkout() {
   async function completeSet(exIdx, setIdx) {
     updateSet(exIdx, setIdx, 'completed', true)
     const restSecs = getLS('mf_rest_seconds', 90)
-    restTotalRef.current = restSecs
-    restStartedAtRef.current = Date.now()
-    setRestMissedSecs(null)
-    setRest(restSecs)
+    startRestTimer(restSecs)
     if (!workoutId) return
 
     const set = exercises[exIdx].sets[setIdx]
@@ -445,7 +446,9 @@ export default function ActiveWorkout() {
         const { error } = await supabase.from('mf_workout_sets').insert(pending)
         if (!error) localStorage.removeItem('mf_pending_sets')
       }
-    } catch {}
+    } catch {
+      /* keep pending sets in storage when sync fails */
+    }
 
     const calories = burnedCalories
     const finishData = {
@@ -1282,7 +1285,7 @@ export default function ActiveWorkout() {
         <div
           className="timer-bar"
           style={{
-            '--p': `${Math.max(0, 100 - (rest / restTotalRef.current) * 100)}%`,
+            '--p': `${Math.max(0, 100 - (rest / restTotal) * 100)}%`,
             position: 'fixed',
             bottom: 0,
             left: 0,
@@ -1302,7 +1305,8 @@ export default function ActiveWorkout() {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button type="button" className="btn btn-dark btn-sm" onClick={() => {
-              restStartedAtRef.current = Date.now() - ((restTotalRef.current - (rest ?? 0) - 15) * 1000)
+              restStartedAtRef.current = nowMs() - ((restTotal - (rest ?? 0) - 15) * 1000)
+              setRestTotal(value => value + 15)
               setRest(value => (value ?? 0) + 15)
             }}>
               +15с

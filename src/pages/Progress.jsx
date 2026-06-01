@@ -66,12 +66,12 @@ export default function Progress() {
         supabase
           .from('mf_body_stats')
           .select('*')
-          .order('recorded_at', { ascending: true })
+          .order('recorded_at', { ascending: false })
           .limit(24),
       ])
 
       setWorkouts(loadedWorkouts ?? [])
-      setBodyStats(stats ?? [])
+      setBodyStats((stats ?? []).slice().reverse())
 
       const map = {}
       ;(sets ?? []).forEach(set => {
@@ -111,7 +111,7 @@ export default function Progress() {
     let count = 0
     for (let week = 0; week < 52; week += 1) {
       const weekStart = new Date(now)
-      weekStart.setDate(now.getDate() - now.getDay() - week * 7)
+      weekStart.setDate(now.getDate() - (now.getDay() || 7) + 1 - week * 7)
       weekStart.setHours(0, 0, 0, 0)
       const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS)
       const hasWorkout = workouts.some(workout => {

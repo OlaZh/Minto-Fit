@@ -8,9 +8,12 @@ create table mf_programs (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,
   name        text not null,
-  type        text not null check (type in ('основна', 'додаткова')),
+  type        text not null,
   color       text,
   emoji       text,
+  has_cardio  boolean not null default true,
+  has_cardio_finish boolean not null default false,
+  activity_type text not null default 'силове',
   created_at  timestamptz not null default now()
 );
 
@@ -29,6 +32,8 @@ create table mf_exercises (
   machine_photo_url text,
   youtube_url       text,
   muscle_group      text,
+  about             text,
+  description       text,
   personal_note     text,
   created_at        timestamptz not null default now()
 );
@@ -48,7 +53,8 @@ create table mf_program_exercises (
   "order"         integer not null default 0,
   default_sets    integer not null default 3,
   default_reps    integer not null default 10,
-  default_weight  numeric(6,2) not null default 0
+  default_weight  numeric(6,2) not null default 0,
+  default_duration integer not null default 0
 );
 
 alter table mf_program_exercises enable row level security;
@@ -73,6 +79,9 @@ create table mf_alternative_exercises (
   id                      uuid primary key default gen_random_uuid(),
   exercise_id             uuid not null references mf_exercises(id) on delete cascade,
   alternative_exercise_id uuid not null references mf_exercises(id) on delete cascade,
+  alt_default_sets        integer,
+  alt_default_reps        integer,
+  alt_default_weight      numeric(6,2),
   unique (exercise_id, alternative_exercise_id)
 );
 

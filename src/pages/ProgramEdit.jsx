@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { IconArrowLeft, IconPlus, IconX, IconCheck, getProgramIcon } from '../components/Icons'
+import { IconArrowLeft, IconPlus, IconX, IconCheck } from '../components/Icons'
+import ProgramGlyph from '../components/ProgramGlyph'
 
 const COLORS = [
   '#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899',
@@ -155,6 +156,7 @@ export default function ProgramEdit() {
       if (toNum(e.sets)   !== null) row.default_sets   = toNum(e.sets)
       if (toNum(e.reps)   !== null) row.default_reps   = toNum(e.reps)
       if (toNum(e.weight) !== null) row.default_weight = toNum(e.weight)
+      if (toNum(e.duration) !== null) row.default_duration = toNum(e.duration)
       return row
     }
 
@@ -219,7 +221,6 @@ export default function ProgramEdit() {
   const filtered = allExercises.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase())
   )
-  const PIcon = getProgramIcon({ name })
 
   return (
     <div className="screen screen--no-nav">
@@ -370,7 +371,7 @@ export default function ProgramEdit() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
               <div className="prog-icon" style={{ background: `${color}18` }}>
-                <PIcon size={20} style={{ color }} />
+                <ProgramGlyph program={{ name }} size={20} style={{ color }} />
               </div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{name.replace(/\s+—.+$/, '') || 'Назва'}</div>

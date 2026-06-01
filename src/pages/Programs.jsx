@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ProfileSheet from '../components/ProfileSheet'
-import { IconUser, IconChevronRight, IconPlus, getProgramIcon } from '../components/Icons'
+import { IconUser, IconChevronRight, IconPlus } from '../components/Icons'
+import ProgramGlyph from '../components/ProgramGlyph'
 
 function resolveGroup(program) {
   const t = program.type ?? 'інше'
@@ -172,7 +173,6 @@ export default function Programs() {
 }
 
 function ProgramRow({ program, onOpen }) {
-  const PIcon = getProgramIcon(program)
   return (
     <button
       type="button"
@@ -186,7 +186,7 @@ function ProgramRow({ program, onOpen }) {
     >
       <div className="card-row">
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-          <PIcon size={20} style={{ color: program.color ?? 'var(--text-3)', flexShrink: 0, marginTop: 3 }} />
+          <ProgramGlyph program={program} size={20} style={{ color: program.color ?? 'var(--text-3)', flexShrink: 0, marginTop: 3 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="h-2">{trimProgramName(program.name)}</div>
             <div className="meta" style={{ marginTop: 3 }}>{extractProgramDescription(program.name)}</div>

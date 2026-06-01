@@ -230,10 +230,3 @@ export const IconNote = (p) => (
     <path d="M8 8h8M8 12h8M8 16h5" />
   </Icon>
 )
-
-export function getProgramIcon(program) {
-  const name = (program.name ?? '').toLowerCase()
-  if (name.startsWith('мікс')) return IconLayers
-  if (name.startsWith('легке')) return IconLeaf
-  return IconDumbbell
-}

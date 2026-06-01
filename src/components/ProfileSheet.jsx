@@ -26,7 +26,7 @@ function getLS(key, fallback) {
   try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v) } catch { return fallback }
 }
 function setLS(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore storage write errors */ }
 }
 
 export default function ProfileSheet({ onClose }) {

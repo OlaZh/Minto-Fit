@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ProfileSheet from '../components/ProfileSheet'
-import { IconUser, IconPlay, getProgramIcon } from '../components/Icons'
+import { IconUser, IconPlay } from '../components/Icons'
+import ProgramGlyph from '../components/ProgramGlyph'
 
 const WEEK_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд']
 
@@ -46,6 +47,10 @@ function formatToday() {
   }).format(new Date())
 }
 
+function nowMs() {
+  return new Date().getTime()
+}
+
 export default function Workout() {
   const [programs, setPrograms] = useState([])
   const [nextProgram, setNextProgram] = useState(null)
@@ -57,6 +62,7 @@ export default function Workout() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const touchStartX = useRef(null)
+  const initialWeekStartRef = useRef(getWeekDays(0)[0])
   const navigate = useNavigate()
 
   const weekDays = useMemo(() => getWeekDays(weekOffset), [weekOffset])
@@ -78,82 +84,6 @@ export default function Workout() {
     return `${s} — ${e}`
   }, [weekOffset, weekDays])
 
-  useEffect(() => { loadAll() }, [])
-
-  async function loadAll() {
-    const { data: user } = await supabase.auth.getUser()
-    const uid = user.user.id
-
-    // Retry pending workout finish (if previous finishWorkout failed due to network)
-    const pendingFinish = JSON.parse(localStorage.getItem('mf_pending_finish') || 'null')
-    if (pendingFinish?.id) {
-      const { error } = await supabase.from('mf_workouts').update({
-        finished_at: pendingFinish.finished_at,
-        duration_minutes: pendingFinish.duration_minutes,
-        intensity: pendingFinish.intensity,
-        calories_burned: pendingFinish.calories_burned,
-      }).eq('id', pendingFinish.id).is('finished_at', null)
-      if (!error) localStorage.removeItem('mf_pending_finish')
-    }
-
-    // Auto-finish abandoned workout (user navigated away without pressing "На головну")
-    const abandoned = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
-    if (abandoned?.id && abandoned?.startedAt) {
-      const durationMs = Date.now() - new Date(abandoned.startedAt).getTime()
-      const durationMinutes = Math.round(durationMs / 60000)
-      if (durationMinutes >= 2) {
-        const { error } = await supabase.from('mf_workouts').update({
-          finished_at: new Date().toISOString(),
-          duration_minutes: durationMinutes,
-          intensity: 'нормально',
-          calories_burned: null,
-        }).eq('id', abandoned.id).is('finished_at', null)
-        if (!error) localStorage.removeItem('mf_current_workout')
-      } else {
-        localStorage.removeItem('mf_current_workout')
-      }
-    }
-
-    const eightWeeksAgo = new Date(weekDays[0])
-    eightWeeksAgo.setDate(weekDays[0].getDate() - 7 * 7)
-
-    const [
-      { data: progs },
-      { data: lastWo },
-      { data: allWos },
-      { data: weekWos },
-    ] = await Promise.all([
-      supabase.from('mf_programs').select('*').order('type').order('name'),
-      supabase.from('mf_workouts').select('program_id').eq('user_id', uid).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('mf_workouts').select('started_at, duration_minutes').eq('user_id', uid).not('finished_at', 'is', null),
-      supabase.from('mf_workouts').select('started_at, program:mf_programs(name, color)').eq('user_id', uid).not('finished_at', 'is', null).gte('started_at', eightWeeksAgo.toISOString()),
-    ])
-
-    const programList = progs ?? []
-    setPrograms(programList)
-
-    const totalCount = allWos?.length ?? 0
-    const totalMinutes = (allWos ?? []).reduce((s, w) => s + (w.duration_minutes ?? 0), 0)
-    const streak = calcStreak(allWos ?? [])
-    setStats({ count: totalCount, hours: Math.round(totalMinutes / 60 * 10) / 10, streak })
-
-    setAllWeekWos(weekWos ?? [])
-
-    const main = programList.filter(p => p.type === 'основна')
-    let suggested = main[0] ?? programList[0] ?? null
-    if (lastWo && main.length > 1) {
-      const idx = main.findIndex(p => p.id === lastWo.program_id)
-      if (idx !== -1) suggested = main[(idx + 1) % main.length]
-    }
-
-    if (suggested) {
-      setNextProgram(suggested)
-      await loadProgStats(suggested.id)
-    }
-
-    setLoading(false)
-  }
-
   async function loadProgStats(programId) {
     const [{ data: exs }, { data: lastWo }] = await Promise.all([
       supabase.from('mf_program_exercises').select('default_sets').eq('program_id', programId),
@@ -172,6 +102,82 @@ export default function Workout() {
     await loadProgStats(prog.id)
   }
 
+  useEffect(() => {
+    async function loadAll() {
+      const { data: user } = await supabase.auth.getUser()
+      const uid = user.user.id
+
+      const pendingFinish = JSON.parse(localStorage.getItem('mf_pending_finish') || 'null')
+      if (pendingFinish?.id) {
+        const { error } = await supabase.from('mf_workouts').update({
+          finished_at: pendingFinish.finished_at,
+          duration_minutes: pendingFinish.duration_minutes,
+          intensity: pendingFinish.intensity,
+          calories_burned: pendingFinish.calories_burned,
+        }).eq('id', pendingFinish.id).is('finished_at', null)
+        if (!error) localStorage.removeItem('mf_pending_finish')
+      }
+
+      const abandoned = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
+      if (abandoned?.id && abandoned?.startedAt) {
+        const durationMs = nowMs() - new Date(abandoned.startedAt).getTime()
+        const durationMinutes = Math.round(durationMs / 60000)
+        if (durationMinutes >= 2) {
+          const { error } = await supabase.from('mf_workouts').update({
+            finished_at: new Date().toISOString(),
+            duration_minutes: durationMinutes,
+            intensity: 'нормально',
+            calories_burned: null,
+          }).eq('id', abandoned.id).is('finished_at', null)
+          if (!error) localStorage.removeItem('mf_current_workout')
+        } else {
+          localStorage.removeItem('mf_current_workout')
+        }
+      }
+
+      const eightWeeksAgo = new Date(initialWeekStartRef.current)
+      eightWeeksAgo.setDate(initialWeekStartRef.current.getDate() - 7 * 7)
+
+      const [
+        { data: progs },
+        { data: lastWo },
+        { data: allWos },
+        { data: weekWos },
+      ] = await Promise.all([
+        supabase.from('mf_programs').select('*').order('type').order('name'),
+        supabase.from('mf_workouts').select('program_id').eq('user_id', uid).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('mf_workouts').select('started_at, duration_minutes').eq('user_id', uid).not('finished_at', 'is', null),
+        supabase.from('mf_workouts').select('started_at, program:mf_programs(name, color)').eq('user_id', uid).not('finished_at', 'is', null).gte('started_at', eightWeeksAgo.toISOString()),
+      ])
+
+      const programList = progs ?? []
+      setPrograms(programList)
+
+      const totalCount = allWos?.length ?? 0
+      const totalMinutes = (allWos ?? []).reduce((s, w) => s + (w.duration_minutes ?? 0), 0)
+      const streak = calcStreak(allWos ?? [])
+      setStats({ count: totalCount, hours: Math.round(totalMinutes / 60 * 10) / 10, streak })
+
+      setAllWeekWos(weekWos ?? [])
+
+      const main = programList.filter(p => p.type === 'основна')
+      let suggested = main[0] ?? programList[0] ?? null
+      if (lastWo && main.length > 1) {
+        const idx = main.findIndex(p => p.id === lastWo.program_id)
+        if (idx !== -1) suggested = main[(idx + 1) % main.length]
+      }
+
+      if (suggested) {
+        setNextProgram(suggested)
+        await loadProgStats(suggested.id)
+      }
+
+      setLoading(false)
+    }
+
+    void loadAll()
+  }, [])
+
   if (loading) {
     return (
       <div className="screen">
@@ -181,7 +187,6 @@ export default function Workout() {
   }
 
   const progColor = nextProgram?.color ?? '#3b82f6'
-  const PIcon = nextProgram ? getProgramIcon(nextProgram) : null
 
   return (
     <div className="screen">
@@ -236,7 +241,7 @@ export default function Workout() {
                     className="prog-icon"
                     style={{ width: 52, height: 52, borderRadius: 16, background: `${progColor}22`, flexShrink: 0 }}
                   >
-                    <PIcon size={26} style={{ color: progColor }} />
+                    <ProgramGlyph program={nextProgram} size={26} style={{ color: progColor }} />
                   </div>
                   <div>
                     <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.05, color: 'var(--text)' }}>
@@ -387,7 +392,6 @@ export default function Workout() {
               <div className="h-3">Обрати програму</div>
               <div className="stack" style={{ gap: 8, maxHeight: '60dvh', overflowY: 'auto' }}>
                 {programs.map(prog => {
-                  const PI = getProgramIcon(prog)
                   const c = prog.color ?? '#3f3f46'
                   const isActive = nextProgram?.id === prog.id
                   return (
@@ -403,7 +407,7 @@ export default function Workout() {
                       onClick={() => selectProgram(prog)}
                     >
                       <div className="prog-icon" style={{ background: `${c}18` }}>
-                        <PI size={18} style={{ color: c }} />
+                        <ProgramGlyph program={prog} size={18} style={{ color: c }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>

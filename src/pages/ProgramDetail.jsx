@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { IconArrowLeft, IconPlay, IconNote, IconPlus, IconX, getProgramIcon } from '../components/Icons'
+import { IconArrowLeft, IconPlay, IconNote, IconPlus, IconX } from '../components/Icons'
+import ProgramGlyph from '../components/ProgramGlyph'
 
 function ProgramIcon({ program }) {
-  const PIcon = getProgramIcon(program)
   return (
     <div className="prog-icon" style={{ background: `${program.color ?? '#3f3f46'}18` }}>
-      <PIcon size={20} style={{ color: program.color ?? 'var(--text-3)' }} />
+      <ProgramGlyph program={program} size={20} style={{ color: program.color ?? 'var(--text-3)' }} />
     </div>
   )
 }
@@ -18,6 +18,13 @@ const EX_FIELDS = [
   { key: 'default_weight',   label: 'Вага, кг', min: 0, step: 0.5 },
   { key: 'default_duration', label: 'Час, хв',  min: 0, step: 1   },
 ]
+
+const FIELD_DEFAULTS = {
+  default_sets: 3,
+  default_reps: 10,
+  default_weight: 0,
+  default_duration: 0,
+}
 
 export default function ProgramDetail() {
   const { id } = useParams()
@@ -54,8 +61,14 @@ export default function ProgramDetail() {
   }, [id])
 
   function commitField(peId, field, raw) {
-    const num = parseFloat(String(raw).replace(',', '.'))
-    const value = isNaN(num) ? null : Math.max(0, num)
+    const trimmed = String(raw).trim()
+    const num = parseFloat(trimmed.replace(',', '.'))
+    const fallback = FIELD_DEFAULTS[field]
+    const value = trimmed === ''
+      ? fallback
+      : Number.isNaN(num)
+      ? fallback
+      : Math.max(0, num)
     setExercises(prev => prev.map(e => e.id === peId ? { ...e, [field]: value } : e))
     setPending(prev => ({ ...prev, [peId]: { ...(prev[peId] ?? {}), [field]: value } }))
     setEditingCell(null)
@@ -66,9 +79,8 @@ export default function ProgramDetail() {
     setSaving(true)
     await Promise.all(
       Object.entries(pending).map(([peId, fields]) => {
-        const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null))
-        if (!Object.keys(patch).length) return Promise.resolve()
-        return supabase.from('mf_program_exercises').update(patch).eq('id', peId)
+        if (!Object.keys(fields).length) return Promise.resolve()
+        return supabase.from('mf_program_exercises').update(fields).eq('id', peId)
       })
     )
     setPending({})
@@ -85,6 +97,11 @@ export default function ProgramDetail() {
   }
 
   async function addExercise(ex) {
+    if (exercises.some(row => row.exercise.id === ex.id)) {
+      setPickerOpen(false)
+      return
+    }
+
     const nextOrder = exercises.length + 1
     const { data: row, error } = await supabase
       .from('mf_program_exercises')
@@ -194,7 +211,7 @@ export default function ProgramDetail() {
         {exercises.map((row) => {
           const { exercise } = row
           return (
-            <article key={exercise.id} className="program-card" style={{ overflow: 'hidden', padding: 0 }}>
+            <article key={row.id} className="program-card" style={{ overflow: 'hidden', padding: 0 }}>
               <div className="exercise-hero" style={{ aspectRatio: '16 / 8', border: 0, borderBottom: '1px solid var(--border)', borderRadius: 0 }}>
                 {exercise.machine_photo_url ? (
                   <img
