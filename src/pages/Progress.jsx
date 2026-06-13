@@ -14,13 +14,7 @@ function formatRecordDate(dateStr) {
   if (diff < 30) return `${Math.floor(diff / 7)} тиж. тому`
   return new Date(dateStr).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
 }
-const WEEKS_BACK = 4
-const WEEKS_FORWARD = 2
 const YEAR_WEEKS = 52
-
-// Sun=0, Mon=1…Sat=6 — display Mon→Sun (Ukrainian convention)
-const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
-const DAY_LABEL = { 0: 'нд', 1: 'пн', 2: 'вт', 3: 'ср', 4: 'чт', 5: 'пт', 6: 'сб' }
 
 const BODY_FIELDS = [
   { key: 'weight_kg', label: 'Вага', unit: 'кг' },
@@ -136,28 +130,36 @@ export default function Progress() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const startDay = new Date(today)
-  startDay.setDate(today.getDate() - (today.getDay() || 7) + 1 - WEEKS_BACK * 7)
-
-  const endDay = new Date(today)
-  endDay.setDate(today.getDate() - (today.getDay() || 7) + 1 + (WEEKS_FORWARD + 1) * 7 - 1)
-
-  const grid = []
-  for (let date = new Date(startDay); date <= endDay; date.setDate(date.getDate() + 1)) {
-    grid.push(new Date(date))
+  // Місячний календар поточного місяця: тижні пн→нд, з порожніми
+  // комірками на початку/кінці, щоб числа стояли під правильними днями.
+  const monthFirst = new Date(today.getFullYear(), today.getMonth(), 1)
+  const monthLast = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+  const leadBlanks = (monthFirst.getDay() || 7) - 1 // пн=0 порожніх, нд=6
+  const monthCells = []
+  for (let i = 0; i < leadBlanks; i++) monthCells.push(null)
+  for (let d = 1; d <= monthLast.getDate(); d++) {
+    monthCells.push(new Date(today.getFullYear(), today.getMonth(), d))
   }
+  while (monthCells.length % 7 !== 0) monthCells.push(null)
+  const monthTitle = monthFirst.toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' })
 
-  const weeks = []
-  for (let index = 0; index < grid.length; index += 7) {
-    weeks.push(grid.slice(index, index + 7))
-  }
+  // Які програми реально були цього місяця — для легенди.
+  const monthPrograms = {}
+  monthCells.forEach(day => {
+    if (!day) return
+    const info = workoutByDay[day.toDateString()]
+    if (info?.color) monthPrograms[info.color] = info.name
+  })
 
+  // Понеділок поточного тижня (getDay: нд=0 → зсув 6, пн=1 → зсув 0).
+  const mondayOffset = (today.getDay() + 6) % 7
   const yearStartDay = new Date(today)
-  yearStartDay.setDate(today.getDate() - today.getDay() - (YEAR_WEEKS - 1) * 7)
+  yearStartDay.setDate(today.getDate() - mondayOffset - (YEAR_WEEKS - 1) * 7)
   const yearGrid = []
   for (let date = new Date(yearStartDay); date <= today; date.setDate(date.getDate() + 1)) {
     yearGrid.push(new Date(date))
   }
+  // Кожен тиждень: [пн, вт, ср, чт, пт, сб, нд].
   const yearWeeks = []
   for (let i = 0; i < yearGrid.length; i += 7) {
     yearWeeks.push(yearGrid.slice(i, i + 7))
@@ -270,65 +272,61 @@ export default function Progress() {
           }}
           onClick={() => setTrackerOpen(true)}
         >
-          <div className="card-row" style={{ marginBottom: 20 }}>
+          <div className="card-row" style={{ marginBottom: 16 }}>
             <div>
               <div className="h-3">Відвідування</div>
-              <div className="meta" style={{ marginTop: 8 }}>Місяць назад — 2 тижні вперед</div>
+              <div className="meta" style={{ marginTop: 6, textTransform: 'capitalize' }}>{monthTitle}</div>
             </div>
             <span className="meta" style={{ fontSize: 11, color: 'var(--text-3)' }}>рік →</span>
           </div>
 
-          <div className="tracker-grid">
-            {/* corner */}
-            <div />
-            {/* month labels */}
-            {weeks.map((week, wi) => (
-              <div key={`m${wi}`} className="tracker-month-lbl">
-                {wi === 0 || week[0].getMonth() !== weeks[wi - 1][0].getMonth()
-                  ? week[0].toLocaleDateString('uk-UA', { month: 'short' }).replace(/\./g, '')
-                  : null}
-              </div>
+          <div className="month-cal">
+            {['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'].map(d => (
+              <div key={d} className="month-cal-dow">{d}</div>
             ))}
-            {/* day rows */}
-            {DAY_ORDER.map((dayIdx, rowIdx) => (
-              <Fragment key={dayIdx}>
-                <div className="tracker-day-lbl">
-                  {rowIdx % 2 === 0 ? DAY_LABEL[dayIdx] : null}
+            {monthCells.map((day, idx) => {
+              if (!day) return <div key={idx} className="month-cal-cell" />
+              const isFuture = day > today
+              const isToday = day.toDateString() === today.toDateString()
+              const info = workoutByDay[day.toDateString()]
+              const color = info?.color
+              return (
+                <div
+                  key={idx}
+                  className="month-cal-cell"
+                  title={info ? info.name : day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                >
+                  <div
+                    className="month-cal-day"
+                    data-today={isToday ? '1' : '0'}
+                    style={{
+                      background: color || 'transparent',
+                      color: color ? '#fff' : isFuture ? 'var(--text-4)' : 'var(--text-2)',
+                      boxShadow: color ? `0 0 8px ${color}66` : 'none',
+                      opacity: isFuture ? 0.4 : 1,
+                    }}
+                  >
+                    {day.getDate()}
+                  </div>
                 </div>
-                {weeks.map((week, wi) => {
-                  const day = week[dayIdx]
-                  if (!day) return <div key={wi} className="tracker-cell" style={{ opacity: 0, border: 'none' }} />
-                  const isFuture = day > today
-                  const isToday = day.toDateString() === today.toDateString()
-                  const info = workoutByDay[day.toDateString()]
-                  const color = info?.color
-                  return (
-                    <div
-                      key={wi}
-                      className="tracker-cell"
-                      title={day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
-                      style={{
-                        background: color ? color : isFuture ? 'transparent' : 'var(--surface-2)',
-                        borderColor: color ? 'transparent' : isToday ? 'var(--accent)' : isFuture ? 'var(--border)' : 'var(--border)',
-                        boxShadow: color ? `0 0 6px ${color}66` : 'none',
-                        opacity: isFuture ? 0.3 : 1,
-                      }}
-                    />
-                  )
-                })}
-              </Fragment>
-            ))}
+              )
+            })}
           </div>
 
           <div className="tracker-legend">
-            <div className="tracker-legend-item">
-              <div className="tracker-legend-dot" style={{ background: 'var(--surface-2)' }} />
-              Немає
-            </div>
-            <div className="tracker-legend-item">
-              <div className="tracker-legend-dot" style={{ background: '#52525b' }} />
-              Тренування
-            </div>
+            {Object.keys(monthPrograms).length === 0 ? (
+              <div className="tracker-legend-item">
+                <div className="tracker-legend-dot" style={{ background: 'var(--surface-2)' }} />
+                Цього місяця тренувань ще немає
+              </div>
+            ) : (
+              Object.entries(monthPrograms).map(([color, name]) => (
+                <div key={color} className="tracker-legend-item">
+                  <div className="tracker-legend-dot" style={{ background: color, borderRadius: '50%' }} />
+                  {name}
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -543,15 +541,15 @@ export default function Progress() {
               gridTemplateColumns: `28px repeat(7, 1fr)`,
               gap: '3px',
             }}>
-              {/* Header row: empty + day labels */}
+              {/* Header row: empty + day labels (пн→нд) */}
               <div />
-              {DAY_ORDER.map(dayIdx => (
-                <div key={dayIdx} style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center', paddingBottom: 6 }}>
-                  {DAY_LABEL[dayIdx]}
+              {['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'].map(d => (
+                <div key={d} style={{ fontSize: 9, color: 'var(--text-3)', textAlign: 'center', paddingBottom: 6 }}>
+                  {d}
                 </div>
               ))}
 
-              {/* Week rows */}
+              {/* Week rows — кожен тиждень уже [пн..нд], рендеримо по порядку */}
               {yearWeeks.map((week, wi) => (
                 <Fragment key={wi}>
                   <div style={{ fontSize: 9, color: 'var(--text-3)', display: 'flex', alignItems: 'center', paddingRight: 4, whiteSpace: 'nowrap' }}>
@@ -559,16 +557,16 @@ export default function Progress() {
                       ? week[0].toLocaleDateString('uk-UA', { month: 'short' }).replace(/\./g, '')
                       : null}
                   </div>
-                  {DAY_ORDER.map(dayIdx => {
-                    const day = week[dayIdx]
-                    if (!day) return <div key={dayIdx} style={{ aspectRatio: 1, borderRadius: 3 }} />
+                  {week.map((day, di) => {
+                    if (!day) return <div key={di} style={{ aspectRatio: 1, borderRadius: 3 }} />
                     const info = workoutByDay[day.toDateString()]
                     const color = info?.color
                     const isFuture = day > today
                     return (
                       <div
-                        key={dayIdx}
+                        key={di}
                         onClick={() => info && setSelectedDay({ date: day, ...info })}
+                        title={day.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
                         style={{
                           aspectRatio: 1, borderRadius: 3,
                           border: color ? 'none' : '1px solid var(--border)',

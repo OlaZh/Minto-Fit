@@ -71,6 +71,9 @@ export default function ActiveWorkout() {
   const startedAtRef = useRef(null)
   const restRef = useRef(null)
   const restStartedAtRef = useRef(null)
+  // Ледаче створення: запис у mf_workouts створюємо лише при першій реальній дії.
+  const workoutSavedRef = useRef(false)
+  const workoutMetaRef = useRef({ id: null, uid: null, startedAt: null })
 
   const isPreview = !!window.history.state?.usr?.preview
 
@@ -110,7 +113,8 @@ export default function ActiveWorkout() {
         // Стоп: фіксуємо накопичений час, позначаємо виконаним.
         return { ...c, startedAt: null, elapsedSec: cardioLiveSec(c), done: true }
       }
-      // Старт / продовження.
+      // Старт: кардіо — реальна дія, тож гарантуємо запис тренування в БД.
+      ensureWorkoutSaved()
       return { ...c, startedAt: nowMs(), done: false }
     })
   }
@@ -237,17 +241,22 @@ export default function ActiveWorkout() {
           .maybeSingle()
 
         if (existingWorkout) {
+          // Незавершене тренування вже існує в БД — продовжуємо його.
+          workoutSavedRef.current = true
+          workoutMetaRef.current = { id: existingWorkout.id, uid, startedAt: existingWorkout.started_at }
           setWorkoutId(existingWorkout.id)
           localStorage.setItem('mf_current_workout', JSON.stringify({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at }))
         } else {
+          // Ледаче створення: НЕ пишемо в БД зараз. Готуємо лише локальний id/час.
+          // Реальний insert станеться при першій дії (ensureWorkoutSaved).
           const saved = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
           const savedIsFresh = saved?.startedAt && (nowMs() - new Date(saved.startedAt).getTime()) < 12 * 60 * 60 * 1000
           const localId = (saved?.programId === programId && savedIsFresh) ? saved.id : crypto.randomUUID()
           const startedAt = new Date().toISOString()
+          workoutSavedRef.current = false
+          workoutMetaRef.current = { id: localId, uid, startedAt }
           setWorkoutId(localId)
           localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId, startedAt }))
-          const { error: insertError } = await supabase.from('mf_workouts').insert({ id: localId, user_id: uid, program_id: programId, started_at: startedAt })
-          if (insertError) console.error('mf_workouts insert error:', insertError)
         }
       }
 
@@ -351,6 +360,25 @@ export default function ActiveWorkout() {
     return () => clearTimeout(restRef.current)
   }, [rest, restTotal])
 
+  // Створює запис у mf_workouts при першій реальній дії (ледаче створення).
+  // Якщо запис уже існує — нічого не робить.
+  async function ensureWorkoutSaved() {
+    if (workoutSavedRef.current || isPreview) return
+    const { id, uid, startedAt } = workoutMetaRef.current
+    if (!id || !uid) return
+    workoutSavedRef.current = true // ставимо одразу, щоб уникнути подвійного insert
+    const { error } = await supabase
+      .from('mf_workouts')
+      .insert({ id, user_id: uid, program_id: programId, started_at: startedAt })
+    if (error) {
+      // Запис міг уже існувати (race / дубль) — це не критично, лишаємо saved=true.
+      if (error.code !== '23505') {
+        console.error('mf_workouts insert error:', error)
+        workoutSavedRef.current = false // дозволити повторну спробу при наступній дії
+      }
+    }
+  }
+
   function updateSet(exIdx, setIdx, field, value) {
     setExercises(prev => prev.map((exercise, i) => (
       i !== exIdx
@@ -388,6 +416,7 @@ export default function ActiveWorkout() {
     const restSecs = getLS('mf_rest_seconds', 90)
     startRestTimer(restSecs)
     if (!workoutId || isPreview) return
+    await ensureWorkoutSaved()
     const ex = exercises[exIdx]
     const displayExercise = replacedExercises[ex.exercise.id] ?? ex.exercise
     const setData = {
@@ -466,6 +495,7 @@ export default function ActiveWorkout() {
     const displayExercise = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
 
     if (isPreview) return
+    await ensureWorkoutSaved()
     const exercise = exercises[exIdx]
     const setData = {
       workout_id: workoutId,
@@ -482,6 +512,17 @@ export default function ActiveWorkout() {
 
   async function finishWorkout(intensity) {
     if (!workoutId) return
+
+    // Ледаче створення: якщо за весь сеанс не було жодної реальної дії —
+    // запис у БД не створювався. Нічого не зберігаємо, просто виходимо.
+    if (!workoutSavedRef.current) {
+      localStorage.removeItem('mf_current_workout')
+      localStorage.removeItem('mf_pending_sets')
+      localStorage.removeItem('mf_pending_finish')
+      wakeLockRef.current?.release()
+      navigate('/')
+      return
+    }
 
     try {
       const pending = JSON.parse(localStorage.getItem('mf_pending_sets') || '[]')
@@ -1304,55 +1345,71 @@ const CARDIO_TYPES = ['Сходи', 'Еліпс', 'Бігова доріжка',
 
 function CardioBlock({ title, state, setState, liveSec, onToggle }) {
   const running = !!state.startedAt
-  const hasTime = liveSec > 0
+  const done = state.done && !running
+
+  // Текст і вигляд кнопки залежно від стану: ще не почато / йде / завершено.
+  let btnLabel = 'Старт'
+  let btnIcon = <IconPlay size={16} />
+  if (running) { btnLabel = 'Стоп'; btnIcon = null }
+  else if (done) { btnLabel = 'Готово'; btnIcon = <IconCheck size={16} /> }
 
   return (
-    <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-        <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}>
+    <div className="card" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)', flexShrink: 0 }}>
           <IconFlame size={20} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="h-3" style={{ fontSize: 15 }}>{title}</div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select
-              value={state.type}
-              onChange={event => setState(value => ({ ...value, type: event.target.value }))}
-              className="select-field"
-              disabled={running}
-            >
-              {CARDIO_TYPES.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-            <div
-              className="num"
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: running ? 'var(--accent)' : hasTime ? 'var(--text)' : 'var(--text-3)',
-                minWidth: 56,
-              }}
-            >
-              {fmtTime(liveSec)}
-            </div>
-          </div>
+          <select
+            value={state.type}
+            onChange={event => setState(value => ({ ...value, type: event.target.value }))}
+            className="select-field"
+            disabled={running}
+            style={{ marginTop: 6 }}
+          >
+            {CARDIO_TYPES.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="icon-btn"
-        style={{
-          background: running ? 'var(--surface-2)' : state.done ? 'var(--accent)' : 'var(--surface-2)',
-          color: state.done && !running ? 'var(--accent-text)' : 'var(--text-2)',
-          borderColor: state.done && !running ? 'transparent' : 'var(--border)',
-          flexShrink: 0,
-        }}
-        aria-label={running ? 'Зупинити кардіо' : 'Запустити кардіо'}
-      >
-        {running ? <IconCheck size={18} /> : state.done ? <IconCheck size={18} /> : <IconPlay size={18} />}
-      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {running && (
+            <span style={{
+              width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)',
+              animation: 'cardioPulse 1s ease-in-out infinite', flexShrink: 0,
+            }} />
+          )}
+          <div
+            className="num"
+            style={{
+              fontSize: 30, fontWeight: 700, lineHeight: 1,
+              color: running ? 'var(--accent)' : done ? 'var(--text)' : 'var(--text-3)',
+            }}
+          >
+            {fmtTime(liveSec)}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="btn btn-sm"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            minWidth: 96, justifyContent: 'center',
+            background: running ? 'var(--danger, #ff5a5f)' : done ? 'var(--surface-2)' : 'var(--accent)',
+            color: running ? '#fff' : done ? 'var(--text-2)' : 'var(--accent-text)',
+            border: done ? '1px solid var(--border)' : 'none',
+            fontWeight: 600,
+          }}
+        >
+          {btnIcon}
+          {btnLabel}
+        </button>
+      </div>
     </div>
   )
 }
