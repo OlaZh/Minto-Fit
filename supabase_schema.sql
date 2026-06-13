@@ -54,7 +54,9 @@ create table mf_program_exercises (
   default_sets    integer not null default 3,
   default_reps    integer not null default 10,
   default_weight  numeric(6,2) not null default 0,
-  default_duration integer not null default 0
+  default_duration integer not null default 0,
+  exercise_mode   text not null default 'reps' check (exercise_mode in ('reps', 'time')),
+  tracks_weight   boolean not null default true
 );
 
 alter table mf_program_exercises enable row level security;
@@ -112,6 +114,8 @@ create table mf_workouts (
   duration_minutes  integer,
   intensity         text check (intensity in ('важко', 'нормально', 'легко')),
   calories_burned   integer,
+  cardio_warmup_minutes integer not null default 0,
+  cardio_finish_minutes integer not null default 0,
   created_at        timestamptz not null default now()
 );
 
@@ -130,6 +134,7 @@ create table mf_workout_sets (
   set_number  integer not null,
   weight      numeric(6,2) not null default 0,
   reps        integer not null default 0,
+  duration_seconds integer not null default 0,
   completed   boolean not null default false,
   created_at  timestamptz not null default now()
 );

@@ -52,8 +52,9 @@ export default function ActiveWorkout() {
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [selectedMood, setSelectedMood] = useState('нормально')
-  const [cardio, setCardio] = useState({ type: 'Еліпс', duration: 30, done: false })
-  const [cardioFinish, setCardioFinish] = useState({ type: 'Еліпс', duration: 20, done: false })
+  const [cardio, setCardio] = useState({ type: 'Еліпс', startedAt: null, elapsedSec: 0, done: false })
+  const [cardioFinish, setCardioFinish] = useState({ type: 'Еліпс', startedAt: null, elapsedSec: 0, done: false })
+  const [, setCardioTick] = useState(0)
   const [rpe, setRpe] = useState({})
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [replacedExercises, setReplacedExercises] = useState({})
@@ -95,6 +96,23 @@ export default function ActiveWorkout() {
     restStartedAtRef.current = startedAt
     setRestMissedSecs(null)
     setRest(seconds)
+  }
+
+  // Жива секундна тривалість кардіо: базовий накопичений час + поточний відрізок.
+  function cardioLiveSec(c) {
+    return c.elapsedSec + (c.startedAt ? Math.floor((nowMs() - c.startedAt) / 1000) : 0)
+  }
+
+  // Старт / стоп кардіо-таймера. setter — setCardio або setCardioFinish.
+  function toggleCardioTimer(setter) {
+    setter(c => {
+      if (c.startedAt) {
+        // Стоп: фіксуємо накопичений час, позначаємо виконаним.
+        return { ...c, startedAt: null, elapsedSec: cardioLiveSec(c), done: true }
+      }
+      // Старт / продовження.
+      return { ...c, startedAt: nowMs(), done: false }
+    })
   }
 
   useEffect(() => {
@@ -141,30 +159,39 @@ export default function ActiveWorkout() {
       if (lastWorkout) {
         const { data: lastSets } = await supabase
           .from('mf_workout_sets')
-          .select('exercise_id, weight, reps, set_number')
+          .select('exercise_id, weight, reps, duration_seconds, set_number')
           .eq('workout_id', lastWorkout.id)
           .order('set_number')
         ;(lastSets ?? []).forEach(set => {
           if (!prev[set.exercise_id]) prev[set.exercise_id] = []
-          prev[set.exercise_id].push({ weight: set.weight, reps: set.reps })
+          prev[set.exercise_id].push({ weight: set.weight, reps: set.reps, duration: set.duration_seconds })
         })
       }
       setPrevSets(prev)
 
-      const exList = (exRows ?? []).map(row => ({
-        exercise: row.exercise,
-        defaultSets: row.default_sets,
-        defaultReps: row.default_reps,
-        defaultWeight: row.default_weight,
-        alternatives: [],
-        hasWarmup: (row.default_weight ?? 0) > 0,
-        warmupDone: false,
-        sets: Array.from({ length: row.default_sets }, (_, i) => ({
-          weight: prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
-          reps: prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
-          completed: false,
-        })),
-      }))
+      const exList = (exRows ?? []).map(row => {
+        const mode = row.exercise_mode === 'time' ? 'time' : 'reps'
+        const tracksWeight = row.tracks_weight !== false
+        return {
+          exercise: row.exercise,
+          mode,
+          tracksWeight,
+          defaultSets: row.default_sets,
+          defaultReps: row.default_reps,
+          defaultWeight: row.default_weight,
+          defaultDuration: row.default_duration,
+          alternatives: [],
+          // Розминка має сенс лише для силових вправ із вагою.
+          hasWarmup: mode === 'reps' && tracksWeight && (row.default_weight ?? 0) > 0,
+          warmupDone: false,
+          sets: Array.from({ length: row.default_sets }, (_, i) => ({
+            weight: prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
+            reps: prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
+            duration: prev[row.exercise.id]?.[i]?.duration ?? row.default_duration ?? 0,
+            completed: false,
+          })),
+        }
+      })
 
       if (exList.length > 0) {
         const exIds = exList.map(item => item.exercise.id)
@@ -195,12 +222,16 @@ export default function ActiveWorkout() {
       setExercises(exList)
 
       if (!isPreview) {
+        // Підхоплюємо лише свіже незавершене тренування (почате в межах 12 год),
+        // щоб старий "висячий" запис із минулих днів не зливався з новим.
+        const resumeCutoff = new Date(nowMs() - 12 * 60 * 60 * 1000).toISOString()
         const { data: existingWorkout } = await supabase
           .from('mf_workouts')
           .select('id, started_at')
           .eq('user_id', uid)
           .eq('program_id', programId)
           .is('finished_at', null)
+          .gte('started_at', resumeCutoff)
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle()
@@ -210,7 +241,8 @@ export default function ActiveWorkout() {
           localStorage.setItem('mf_current_workout', JSON.stringify({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at }))
         } else {
           const saved = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
-          const localId = (saved?.programId === programId) ? saved.id : crypto.randomUUID()
+          const savedIsFresh = saved?.startedAt && (nowMs() - new Date(saved.startedAt).getTime()) < 12 * 60 * 60 * 1000
+          const localId = (saved?.programId === programId && savedIsFresh) ? saved.id : crypto.randomUUID()
           const startedAt = new Date().toISOString()
           setWorkoutId(localId)
           localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId, startedAt }))
@@ -264,6 +296,13 @@ export default function ActiveWorkout() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [restTotal])
+
+  // Поки якийсь кардіо-таймер запущено — оновлюємо екран щосекунди.
+  useEffect(() => {
+    if (!cardio.startedAt && !cardioFinish.startedAt) return
+    const id = setInterval(() => setCardioTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [cardio.startedAt, cardioFinish.startedAt])
 
   useEffect(() => {
     const up = () => setIsOnline(true)
@@ -357,6 +396,7 @@ export default function ActiveWorkout() {
       set_number: 0,
       weight: Math.round((ex.sets[0]?.weight ?? ex.defaultWeight ?? 0) * 0.5),
       reps: ex.sets[0]?.reps ?? ex.defaultReps,
+      duration_seconds: 0,
       completed: true,
     }
     const { error } = await supabase.from('mf_workout_sets').insert(setData)
@@ -390,6 +430,7 @@ export default function ActiveWorkout() {
           {
             weight: last?.weight ?? 0,
             reps: last?.reps ?? 10,
+            duration: last?.duration ?? 0,
             completed: false,
           },
         ],
@@ -425,12 +466,14 @@ export default function ActiveWorkout() {
     const displayExercise = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
 
     if (isPreview) return
+    const exercise = exercises[exIdx]
     const setData = {
       workout_id: workoutId,
       exercise_id: displayExercise.id,
       set_number: setIdx + 1,
-      weight: set.weight,
-      reps: set.reps,
+      weight: exercise.tracksWeight === false ? 0 : set.weight,
+      reps: exercise.mode === 'time' ? 0 : set.reps,
+      duration_seconds: exercise.mode === 'time' ? (set.duration ?? 0) : 0,
       completed: true,
     }
     const { error } = await supabase.from('mf_workout_sets').insert(setData)
@@ -451,12 +494,21 @@ export default function ActiveWorkout() {
     }
 
     const calories = burnedCalories
+    // Обмежуємо тривалість 6 годинами — захист від кривого elapsed,
+    // якщо started_at виявився старим (підхоплений запис із минулого дня).
+    const durationMinutes = Math.min(360, Math.max(1, Math.round(elapsed / 60)))
+    // Кардіо відбувається в межах загального elapsed, тож не додаємо його зверху —
+    // зберігаємо окремо для статистики/summary.
+    const cardioWarmupMin = Math.round(cardioLiveSec(cardio) / 60)
+    const cardioFinishMin = Math.round(cardioLiveSec(cardioFinish) / 60)
     const finishData = {
       id: workoutId,
       finished_at: new Date().toISOString(),
-      duration_minutes: Math.round(elapsed / 60),
+      duration_minutes: durationMinutes,
       intensity,
       calories_burned: calories,
+      cardio_warmup_minutes: cardioWarmupMin,
+      cardio_finish_minutes: cardioFinishMin,
     }
     localStorage.setItem('mf_pending_finish', JSON.stringify(finishData))
 
@@ -467,6 +519,8 @@ export default function ActiveWorkout() {
         duration_minutes: finishData.duration_minutes,
         intensity,
         calories_burned: calories,
+        cardio_warmup_minutes: cardioWarmupMin,
+        cardio_finish_minutes: cardioFinishMin,
       })
       .eq('id', workoutId)
 
@@ -501,7 +555,9 @@ export default function ActiveWorkout() {
   const totalSets = exercises.reduce((total, exercise) => total + exercise.sets.length, 0)
   const progress = totalSets ? Math.round((completedSets / totalSets) * 100) : 0
   const totalVolume = exercises.reduce(
-    (sum, exercise) => sum + exercise.sets.filter(set => set.completed).reduce((acc, set) => acc + set.weight * set.reps, 0),
+    (sum, exercise) => (exercise.mode === 'time' || exercise.tracksWeight === false)
+      ? sum
+      : sum + exercise.sets.filter(set => set.completed).reduce((acc, set) => acc + set.weight * set.reps, 0),
     0,
   )
   const metValues = MET_TABLE[program?.activity_type] ?? MET_TABLE.силове
@@ -712,48 +768,15 @@ export default function ActiveWorkout() {
           </section>
         )}
 
-        {program?.has_cardio !== false && <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-            <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}><IconFlame size={20} /></div>
-            <div style={{ flex: 1 }}>
-              <div className="h-3" style={{ fontSize: 15 }}>Кардіо розминка</div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                <select
-                  value={cardio.type}
-                  onChange={event => setCardio(value => ({ ...value, type: event.target.value }))}
-                  className="select-field"
-                >
-                  {['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер'].map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="number"
-                    value={cardio.duration}
-                    onChange={event => setCardio(value => ({ ...value, duration: Number(event.target.value) || 0 }))}
-                    className="field"
-                    style={{ width: 62, textAlign: 'center' }}
-                  />
-                  <span className="meta">хв</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCardio(value => ({ ...value, done: !value.done }))}
-            className="icon-btn"
-            style={{
-              background: cardio.done ? 'var(--accent)' : 'var(--surface-2)',
-              color: cardio.done ? 'var(--accent-text)' : 'var(--text-2)',
-              borderColor: cardio.done ? 'transparent' : 'var(--border)',
-            }}
-            aria-label="Завершити розминку"
-          >
-            {cardio.done ? <IconCheck size={18} /> : ''}
-          </button>
-        </div>}
+        {program?.has_cardio !== false && (
+          <CardioBlock
+            title="Кардіо розминка"
+            state={cardio}
+            setState={setCardio}
+            liveSec={cardioLiveSec(cardio)}
+            onToggle={() => toggleCardioTimer(setCardio)}
+          />
+        )}
 
 
         <div className="stack" style={{ gap: 12 }}>
@@ -763,6 +786,16 @@ export default function ActiveWorkout() {
             const workingWeight = exercise.sets[0]?.weight ?? exercise.defaultWeight ?? 0
             const warmupWeight = workingWeight > 0 ? Math.round(workingWeight * 0.5) : 0
             const exerciseDone = exercise.sets.every(set => set.completed)
+            const isTime = exercise.mode === 'time'
+            const showWeight = exercise.tracksWeight !== false
+            // # | Минулого | [Вага] | Повт./Час | ✓
+            const rowCols = showWeight
+              ? '28px 64px 1fr 1fr 36px'
+              : '28px 64px 1fr 36px'
+            const valueField = isTime ? 'duration' : 'reps'
+            const fmtPrev = p => isTime
+              ? `${p.duration ?? 0}с`
+              : (showWeight ? `${p.weight}×${p.reps}` : `${p.reps}`)
 
             return (
               <div key={exercise.exercise.id} className="ex-card" data-done={exerciseDone ? '1' : '0'}>
@@ -811,19 +844,19 @@ export default function ActiveWorkout() {
                 </div>
 
                 <div className="ex-table">
-                  <div className="ex-row ex-row-head">
+                  <div className="ex-row ex-row-head" style={{ gridTemplateColumns: rowCols }}>
                     <div>#</div>
                     <div>Минулого</div>
-                    <div>Вага</div>
-                    <div>Повт.</div>
+                    {showWeight && <div>Вага</div>}
+                    <div>{isTime ? 'Час, с' : 'Повт.'}</div>
                     <div />
                   </div>
 
                   {exercise.hasWarmup && (
-                    <div className="ex-row" data-done={exercise.warmupDone ? '1' : '0'}>
+                    <div className="ex-row" data-done={exercise.warmupDone ? '1' : '0'} style={{ gridTemplateColumns: rowCols }}>
                       <div className="set-num set-num--warmup">Р</div>
                       <div className="set-last">розм.</div>
-                      <div className="set-value num">{warmupWeight}</div>
+                      {showWeight && <div className="set-value num">{warmupWeight}</div>}
                       <div className="set-value num">{exercise.sets[0]?.reps ?? exercise.defaultReps}</div>
                       <button
                         type="button"
@@ -840,90 +873,68 @@ export default function ActiveWorkout() {
                     const prev = prevSets[exercise.exercise.id]?.[setIndex]
 
                     return (
-                      <div key={setIndex} className="ex-row" data-done={set.completed ? '1' : '0'}>
+                      <div key={setIndex} className="ex-row" data-done={set.completed ? '1' : '0'} style={{ gridTemplateColumns: rowCols }}>
                         <div className="set-num">{setIndex + 1}</div>
-                        <div className="set-last">{prev ? `${prev.weight}×${prev.reps}` : (warmupWeight > 0 ? `${exercise.defaultWeight ?? 0}×${exercise.defaultReps ?? 12}` : '—')}</div>
-                        <div className="set-value num">
-                          {editingCell?.exerciseId === exercise.exercise.id && editingCell?.setIdx === setIndex && editingCell?.field === 'weight' ? (
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoFocus
-                              defaultValue={String(set.weight)}
-                              className="set-inline-input"
-                              onBlur={event => {
-                                updateSet(
-                                  exerciseIndex,
-                                  setIndex,
-                                  'weight',
-                                  parseCellValue('weight', event.target.value, set.weight),
-                                )
-                                stopEditing()
-                              }}
-                              onKeyDown={event => {
-                                if (event.key === 'Enter') {
-                                  updateSet(
-                                    exerciseIndex,
-                                    setIndex,
-                                    'weight',
-                                    parseCellValue('weight', event.currentTarget.value, set.weight),
-                                  )
+                        <div className="set-last">{prev ? fmtPrev(prev) : (warmupWeight > 0 ? `${exercise.defaultWeight ?? 0}×${exercise.defaultReps ?? 12}` : '—')}</div>
+                        {showWeight && (
+                          <div className="set-value num">
+                            {editingCell?.exerciseId === exercise.exercise.id && editingCell?.setIdx === setIndex && editingCell?.field === 'weight' ? (
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoFocus
+                                defaultValue={String(set.weight)}
+                                className="set-inline-input"
+                                onBlur={event => {
+                                  updateSet(exerciseIndex, setIndex, 'weight', parseCellValue('weight', event.target.value, set.weight))
                                   stopEditing()
-                                }
-                                if (event.key === 'Escape') {
-                                  stopEditing()
-                                }
-                              }}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className="set-edit-btn num"
-                              onClick={() => startEditing(exercise.exercise.id, setIndex, 'weight')}
-                            >
-                              {set.weight}
-                            </button>
-                          )}
-                        </div>
+                                }}
+                                onKeyDown={event => {
+                                  if (event.key === 'Enter') {
+                                    updateSet(exerciseIndex, setIndex, 'weight', parseCellValue('weight', event.currentTarget.value, set.weight))
+                                    stopEditing()
+                                  }
+                                  if (event.key === 'Escape') stopEditing()
+                                }}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="set-edit-btn num"
+                                onClick={() => startEditing(exercise.exercise.id, setIndex, 'weight')}
+                              >
+                                {set.weight}
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <div className="set-value num">
-                          {editingCell?.exerciseId === exercise.exercise.id && editingCell?.setIdx === setIndex && editingCell?.field === 'reps' ? (
+                          {editingCell?.exerciseId === exercise.exercise.id && editingCell?.setIdx === setIndex && editingCell?.field === valueField ? (
                             <input
                               type="text"
                               inputMode="numeric"
                               autoFocus
-                              defaultValue={String(set.reps)}
+                              defaultValue={String(set[valueField] ?? 0)}
                               className="set-inline-input"
                               onBlur={event => {
-                                updateSet(
-                                  exerciseIndex,
-                                  setIndex,
-                                  'reps',
-                                  parseCellValue('reps', event.target.value, set.reps),
-                                )
+                                updateSet(exerciseIndex, setIndex, valueField, parseCellValue('reps', event.target.value, set[valueField] ?? 0))
                                 stopEditing()
                               }}
                               onKeyDown={event => {
                                 if (event.key === 'Enter') {
-                                  updateSet(
-                                    exerciseIndex,
-                                    setIndex,
-                                    'reps',
-                                    parseCellValue('reps', event.currentTarget.value, set.reps),
-                                  )
+                                  updateSet(exerciseIndex, setIndex, valueField, parseCellValue('reps', event.currentTarget.value, set[valueField] ?? 0))
                                   stopEditing()
                                 }
-                                if (event.key === 'Escape') {
-                                  stopEditing()
-                                }
+                                if (event.key === 'Escape') stopEditing()
                               }}
                             />
                           ) : (
                             <button
                               type="button"
                               className="set-edit-btn num"
-                              onClick={() => startEditing(exercise.exercise.id, setIndex, 'reps')}
+                              onClick={() => startEditing(exercise.exercise.id, setIndex, valueField)}
                             >
-                              {set.reps}
+                              {set[valueField] ?? 0}
                             </button>
                           )}
                         </div>
@@ -1043,6 +1054,7 @@ export default function ActiveWorkout() {
                                   sets: Array.from({ length: alt.altDefaultSets ?? 3 }, () => ({
                                     weight: alt.altDefaultWeight ?? 0,
                                     reps: alt.altDefaultReps ?? 12,
+                                    duration: 0,
                                     completed: false,
                                   })),
                                 }
@@ -1060,49 +1072,13 @@ export default function ActiveWorkout() {
         </div>
 
         {program?.has_cardio_finish && !isPreview && (
-          <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-              <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}>
-                <IconFlame size={20} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="h-3" style={{ fontSize: 15 }}>Кардіо після тренування</div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                  <select
-                    value={cardioFinish.type}
-                    onChange={e => setCardioFinish(v => ({ ...v, type: e.target.value }))}
-                    className="select-field"
-                  >
-                    {['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер'].map(o => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <input
-                      type="number"
-                      value={cardioFinish.duration}
-                      onChange={e => setCardioFinish(v => ({ ...v, duration: Number(e.target.value) || 0 }))}
-                      className="field"
-                      style={{ width: 62, textAlign: 'center' }}
-                    />
-                    <span className="meta">хв</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCardioFinish(v => ({ ...v, done: !v.done }))}
-              className="icon-btn"
-              style={{
-                background: cardioFinish.done ? 'var(--accent)' : 'var(--surface-2)',
-                color: cardioFinish.done ? 'var(--accent-text)' : 'var(--text-2)',
-                borderColor: cardioFinish.done ? 'transparent' : 'var(--border)',
-              }}
-            >
-              {cardioFinish.done ? <IconCheck size={18} /> : ''}
-            </button>
-          </div>
+          <CardioBlock
+            title="Кардіо після тренування"
+            state={cardioFinish}
+            setState={setCardioFinish}
+            liveSec={cardioLiveSec(cardioFinish)}
+            onToggle={() => toggleCardioTimer(setCardioFinish)}
+          />
         )}
       </div>
       </div>
@@ -1320,6 +1296,63 @@ export default function ActiveWorkout() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const CARDIO_TYPES = ['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер']
+
+function CardioBlock({ title, state, setState, liveSec, onToggle }) {
+  const running = !!state.startedAt
+  const hasTime = liveSec > 0
+
+  return (
+    <div className="card-row card" style={{ padding: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        <div className="prog-icon" style={{ width: 42, height: 42, background: 'rgba(255,255,255,0.05)' }}>
+          <IconFlame size={20} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="h-3" style={{ fontSize: 15 }}>{title}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              value={state.type}
+              onChange={event => setState(value => ({ ...value, type: event.target.value }))}
+              className="select-field"
+              disabled={running}
+            >
+              {CARDIO_TYPES.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <div
+              className="num"
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: running ? 'var(--accent)' : hasTime ? 'var(--text)' : 'var(--text-3)',
+                minWidth: 56,
+              }}
+            >
+              {fmtTime(liveSec)}
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="icon-btn"
+        style={{
+          background: running ? 'var(--surface-2)' : state.done ? 'var(--accent)' : 'var(--surface-2)',
+          color: state.done && !running ? 'var(--accent-text)' : 'var(--text-2)',
+          borderColor: state.done && !running ? 'transparent' : 'var(--border)',
+          flexShrink: 0,
+        }}
+        aria-label={running ? 'Зупинити кардіо' : 'Запустити кардіо'}
+      >
+        {running ? <IconCheck size={18} /> : state.done ? <IconCheck size={18} /> : <IconPlay size={18} />}
+      </button>
     </div>
   )
 }

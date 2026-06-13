@@ -20,12 +20,19 @@ const ACTIVITY_TYPES = [
   { key: 'розтяжка',       label: 'Розтяжка' },
 ]
 
-const NUM_FIELDS = [
-  { key: 'sets',   label: 'Підходи',    placeholder: '—' },
-  { key: 'reps',   label: 'Повтори',    placeholder: '—' },
-  { key: 'weight', label: 'Вага, кг',   placeholder: '—' },
-  { key: 'duration', label: 'Час, хв',  placeholder: '—' },
-]
+// Які числові поля показувати залежно від режиму вправи та tracks_weight.
+function numFieldsFor(mode, tracksWeight) {
+  const fields = [{ key: 'sets', label: 'Підходи', placeholder: '—' }]
+  if (mode === 'time') {
+    fields.push({ key: 'duration', label: 'Час, сек', placeholder: '—' })
+  } else {
+    fields.push({ key: 'reps', label: 'Повтори', placeholder: '—' })
+  }
+  if (tracksWeight) {
+    fields.push({ key: 'weight', label: 'Вага, кг', placeholder: '—' })
+  }
+  return fields
+}
 
 function toNum(v) {
   const n = parseFloat(String(v).replace(',', '.'))
@@ -89,6 +96,8 @@ export default function ProgramEdit() {
           reps:     e.default_reps   != null ? String(e.default_reps)   : '',
           weight:   e.default_weight != null ? String(e.default_weight) : '',
           duration: e.default_duration != null ? String(e.default_duration) : '',
+          mode:     e.exercise_mode ?? 'reps',
+          tracks_weight: e.tracks_weight ?? true,
           description: e.exercise.description ?? '',
           about: e.exercise.about ?? '',
           photo_url: e.exercise.machine_photo_url ?? '',
@@ -113,6 +122,7 @@ export default function ProgramEdit() {
         exercise_id: ex.id,
         name: ex.name,
         sets: '', reps: '', weight: '', duration: '',
+        mode: 'reps', tracks_weight: true,
         description: ex.description ?? '',
         about: ex.about ?? '',
         photo_url: ex.machine_photo_url ?? '',
@@ -152,11 +162,22 @@ export default function ProgramEdit() {
     setSaveError(null)
 
     const buildRow = (e, i, progId) => {
-      const row = { program_id: progId, exercise_id: e.exercise_id, order: i + 1 }
-      if (toNum(e.sets)   !== null) row.default_sets   = toNum(e.sets)
-      if (toNum(e.reps)   !== null) row.default_reps   = toNum(e.reps)
-      if (toNum(e.weight) !== null) row.default_weight = toNum(e.weight)
-      if (toNum(e.duration) !== null) row.default_duration = toNum(e.duration)
+      const mode = e.mode === 'time' ? 'time' : 'reps'
+      const tracksWeight = e.tracks_weight !== false
+      const row = {
+        program_id: progId,
+        exercise_id: e.exercise_id,
+        order: i + 1,
+        exercise_mode: mode,
+        tracks_weight: tracksWeight,
+      }
+      if (toNum(e.sets) !== null) row.default_sets = toNum(e.sets)
+      if (mode === 'time') {
+        if (toNum(e.duration) !== null) row.default_duration = toNum(e.duration)
+      } else {
+        if (toNum(e.reps) !== null) row.default_reps = toNum(e.reps)
+      }
+      if (tracksWeight && toNum(e.weight) !== null) row.default_weight = toNum(e.weight)
       return row
     }
 
@@ -395,8 +416,53 @@ export default function ProgramEdit() {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {NUM_FIELDS.map(f => (
+              <div className="stack" style={{ gap: 8 }}>
+                <div className="meta" style={{ fontSize: 11 }}>Формат виконання</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[
+                    { key: 'reps', label: 'За повтореннями' },
+                    { key: 'time', label: 'На час' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      className="pill-btn"
+                      data-active={(ex.mode ?? 'reps') === opt.key ? '1' : '0'}
+                      onClick={() => updateField(idx, 'mode', opt.key)}
+                      style={{ flex: 1, fontSize: 12 }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateField(idx, 'tracks_weight', !(ex.tracks_weight !== false))}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', borderRadius: 12,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    cursor: 'pointer', width: '100%', textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>З додатковою вагою</div>
+                  <div style={{
+                    width: 42, height: 24, borderRadius: 12, flexShrink: 0,
+                    background: ex.tracks_weight !== false ? 'var(--accent)' : 'var(--surface-3)',
+                    position: 'relative', transition: 'background 0.2s',
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 3, left: ex.tracks_weight !== false ? 20 : 3,
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: ex.tracks_weight !== false ? 'var(--bg)' : 'var(--text-3)',
+                      transition: 'left 0.2s',
+                    }} />
+                  </div>
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${numFieldsFor(ex.mode ?? 'reps', ex.tracks_weight !== false).length}, 1fr)`, gap: 8 }}>
+                {numFieldsFor(ex.mode ?? 'reps', ex.tracks_weight !== false).map(f => (
                   <div key={f.key} className="stack" style={{ gap: 4 }}>
                     <div className="meta" style={{ fontSize: 11 }}>{f.label}</div>
                     <input
