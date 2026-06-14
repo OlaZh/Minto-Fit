@@ -66,6 +66,7 @@ export default function Workout() {
   const [allWeekWos, setAllWeekWos] = useState([])
   const [weekOffset, setWeekOffset] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const touchStartX = useRef(null)
@@ -92,10 +93,11 @@ export default function Workout() {
   }, [weekOffset, weekDays])
 
   async function loadProgStats(programId) {
-    const [{ data: exs }, { data: lastWo }] = await Promise.all([
+    const [{ data: exs, error: exsError }, { data: lastWo, error: lastWoError }] = await Promise.all([
       supabase.from('mf_program_exercises').select('default_sets').eq('program_id', programId),
       supabase.from('mf_workouts').select('duration_minutes').eq('program_id', programId).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
     ])
+    if (exsError || lastWoError) throw exsError ?? lastWoError
     const exercises = exs?.length ?? 0
     const sets = (exs ?? []).reduce((s, e) => s + (e.default_sets ?? 3), 0)
     const isEstimate = !lastWo?.duration_minutes
@@ -104,96 +106,112 @@ export default function Workout() {
   }
 
   async function selectProgram(prog) {
-    setNextProgram(prog)
-    setPickerOpen(false)
-    await loadProgStats(prog.id)
+    setLoadError(null)
+    try {
+      setNextProgram(prog)
+      setPickerOpen(false)
+      await loadProgStats(prog.id)
+    } catch (error) {
+      console.error('selectProgram:', error)
+      setLoadError('Не вдалося завантажити дані програми. Спробуй оновити екран.')
+    }
   }
 
   useEffect(() => {
     async function loadAll() {
-      const { data: user } = await supabase.auth.getUser()
-      const uid = user.user.id
+      setLoadError(null)
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        if (userError || !userData?.user?.id) throw userError ?? new Error('No user')
+        const uid = userData.user.id
 
-      const pendingFinish = getPendingFinish()
-      if (pendingFinish?.id) {
-        const pendingSync = await syncPendingSetsForWorkout(supabase, pendingFinish.id)
-        if (!pendingSync.ok) {
-          console.error('pending finish sync failed:', pendingSync.error)
-        } else {
-          const { error } = await supabase.from('mf_workouts').update({
-            finished_at: pendingFinish.finished_at,
-            duration_minutes: pendingFinish.duration_minutes,
-            intensity: pendingFinish.intensity,
-            calories_burned: pendingFinish.calories_burned,
-            cardio_warmup_minutes: pendingFinish.cardio_warmup_minutes,
-            cardio_finish_minutes: pendingFinish.cardio_finish_minutes,
-          }).eq('id', pendingFinish.id).is('finished_at', null)
-          if (!error) clearPendingFinish(pendingFinish.id)
+        const pendingFinish = getPendingFinish()
+        if (pendingFinish?.id) {
+          const pendingSync = await syncPendingSetsForWorkout(supabase, pendingFinish.id)
+          if (!pendingSync.ok) {
+            console.error('pending finish sync failed:', pendingSync.error)
+          } else {
+            const { error } = await supabase.from('mf_workouts').update({
+              finished_at: pendingFinish.finished_at,
+              duration_minutes: pendingFinish.duration_minutes,
+              intensity: pendingFinish.intensity,
+              calories_burned: pendingFinish.calories_burned,
+              cardio_warmup_minutes: pendingFinish.cardio_warmup_minutes,
+              cardio_finish_minutes: pendingFinish.cardio_finish_minutes,
+            }).eq('id', pendingFinish.id).is('finished_at', null)
+            if (!error) clearPendingFinish(pendingFinish.id)
+          }
         }
-      }
 
-      const abandoned = getCurrentWorkout()
-      if (abandoned?.id && abandoned?.startedAt) {
-        const pendingSync = await syncPendingSetsForWorkout(supabase, abandoned.id)
-        if (!pendingSync.ok) {
-          console.error('abandoned workout pending sync failed:', pendingSync.error)
-        } else {
-          const durationMs = nowMs() - new Date(abandoned.startedAt).getTime()
-          const durationMinutes = Math.max(1, Math.round(durationMs / 60000))
-          const { data: recoveredWorkout, error } = await supabase
-            .from('mf_workouts')
-            .update({
-              finished_at: new Date().toISOString(),
-              duration_minutes: durationMinutes,
-              intensity: 'нормально',
-              calories_burned: null,
-            })
-            .eq('id', abandoned.id)
-            .is('finished_at', null)
-            .select('id')
-            .maybeSingle()
-          if (!error && recoveredWorkout?.id) clearCurrentWorkout()
+        const abandoned = getCurrentWorkout()
+        if (abandoned?.id && abandoned?.startedAt) {
+          const pendingSync = await syncPendingSetsForWorkout(supabase, abandoned.id)
+          if (!pendingSync.ok) {
+            console.error('abandoned workout pending sync failed:', pendingSync.error)
+          } else {
+            const durationMs = nowMs() - new Date(abandoned.startedAt).getTime()
+            const durationMinutes = Math.max(1, Math.round(durationMs / 60000))
+            const { data: recoveredWorkout, error } = await supabase
+              .from('mf_workouts')
+              .update({
+                finished_at: new Date().toISOString(),
+                duration_minutes: durationMinutes,
+                intensity: 'нормально',
+                calories_burned: null,
+              })
+              .eq('id', abandoned.id)
+              .is('finished_at', null)
+              .select('id')
+              .maybeSingle()
+            if (!error && recoveredWorkout?.id) clearCurrentWorkout()
+          }
         }
+
+        const eightWeeksAgo = new Date(initialWeekStartRef.current)
+        eightWeeksAgo.setDate(initialWeekStartRef.current.getDate() - 7 * 7)
+
+        const [
+          { data: progs, error: progsError },
+          { data: lastWo, error: lastWoError },
+          { data: allWos, error: allWosError },
+          { data: weekWos, error: weekWosError },
+        ] = await Promise.all([
+          supabase.from('mf_programs').select('*').order('type').order('name'),
+          supabase.from('mf_workouts').select('program_id').eq('user_id', uid).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
+          supabase.from('mf_workouts').select('started_at, duration_minutes').eq('user_id', uid).not('finished_at', 'is', null),
+          supabase.from('mf_workouts').select('started_at, program:mf_programs(name, color)').eq('user_id', uid).not('finished_at', 'is', null).gte('started_at', eightWeeksAgo.toISOString()),
+        ])
+        if (progsError || lastWoError || allWosError || weekWosError) {
+          throw progsError ?? lastWoError ?? allWosError ?? weekWosError
+        }
+
+        const programList = progs ?? []
+        setPrograms(programList)
+
+        const totalCount = allWos?.length ?? 0
+        const totalMinutes = (allWos ?? []).reduce((s, w) => s + (w.duration_minutes ?? 0), 0)
+        const streak = calcStreak(allWos ?? [])
+        setStats({ count: totalCount, hours: Math.round(totalMinutes / 60 * 10) / 10, streak })
+
+        setAllWeekWos(weekWos ?? [])
+
+        const main = programList.filter(p => p.type === 'основна')
+        let suggested = main[0] ?? programList[0] ?? null
+        if (lastWo && main.length > 1) {
+          const idx = main.findIndex(p => p.id === lastWo.program_id)
+          if (idx !== -1) suggested = main[(idx + 1) % main.length]
+        }
+
+        if (suggested) {
+          setNextProgram(suggested)
+          await loadProgStats(suggested.id)
+        }
+      } catch (error) {
+        console.error('loadAll:', error)
+        setLoadError('Не вдалося завантажити головний екран. Спробуй оновити застосунок.')
+      } finally {
+        setLoading(false)
       }
-
-      const eightWeeksAgo = new Date(initialWeekStartRef.current)
-      eightWeeksAgo.setDate(initialWeekStartRef.current.getDate() - 7 * 7)
-
-      const [
-        { data: progs },
-        { data: lastWo },
-        { data: allWos },
-        { data: weekWos },
-      ] = await Promise.all([
-        supabase.from('mf_programs').select('*').order('type').order('name'),
-        supabase.from('mf_workouts').select('program_id').eq('user_id', uid).not('finished_at', 'is', null).order('finished_at', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('mf_workouts').select('started_at, duration_minutes').eq('user_id', uid).not('finished_at', 'is', null),
-        supabase.from('mf_workouts').select('started_at, program:mf_programs(name, color)').eq('user_id', uid).not('finished_at', 'is', null).gte('started_at', eightWeeksAgo.toISOString()),
-      ])
-
-      const programList = progs ?? []
-      setPrograms(programList)
-
-      const totalCount = allWos?.length ?? 0
-      const totalMinutes = (allWos ?? []).reduce((s, w) => s + (w.duration_minutes ?? 0), 0)
-      const streak = calcStreak(allWos ?? [])
-      setStats({ count: totalCount, hours: Math.round(totalMinutes / 60 * 10) / 10, streak })
-
-      setAllWeekWos(weekWos ?? [])
-
-      const main = programList.filter(p => p.type === 'основна')
-      let suggested = main[0] ?? programList[0] ?? null
-      if (lastWo && main.length > 1) {
-        const idx = main.findIndex(p => p.id === lastWo.program_id)
-        if (idx !== -1) suggested = main[(idx + 1) % main.length]
-      }
-
-      if (suggested) {
-        setNextProgram(suggested)
-        await loadProgStats(suggested.id)
-      }
-
-      setLoading(false)
     }
 
     void loadAll()
@@ -203,6 +221,26 @@ export default function Workout() {
     return (
       <div className="screen">
         <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="screen">
+        <div className="page page-top stack">
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 16,
+            padding: '14px 16px',
+            color: 'var(--danger)',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+            {loadError}
+          </div>
+        </div>
       </div>
     )
   }

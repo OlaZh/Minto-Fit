@@ -46,22 +46,34 @@ function groupMeta(key) {
 export default function Programs() {
   const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(new Set())
   const navigate = useNavigate()
 
   useEffect(() => {
-    supabase
-      .from('mf_programs')
-      .select('*')
-      .order('type')
-      .order('name')
-      .then(({ data }) => {
+    async function loadPrograms() {
+      setLoadError(null)
+      try {
+        const { data, error } = await supabase
+          .from('mf_programs')
+          .select('*')
+          .order('type')
+          .order('name')
+        if (error) throw error
+
         const list = data ?? []
         setPrograms(list)
         setCollapsed(new Set(Object.keys(groupPrograms(list))))
+      } catch (error) {
+        console.error('loadPrograms:', error)
+        setLoadError('Не вдалося завантажити список програм. Спробуй оновити застосунок.')
+      } finally {
         setLoading(false)
-      })
+      }
+    }
+
+    void loadPrograms()
   }, [])
 
   function toggleGroup(key) {
@@ -76,6 +88,26 @@ export default function Programs() {
     return (
       <div className="screen">
         <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="screen">
+        <div className="page page-top stack">
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 16,
+            padding: '14px 16px',
+            color: 'var(--danger)',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+            {loadError}
+          </div>
+        </div>
       </div>
     )
   }

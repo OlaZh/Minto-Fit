@@ -22,6 +22,7 @@ export default function Progress() {
   const [records, setRecords] = useState([])
   const [bodyStats, setBodyStats] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [bodyMode, setBodyMode] = useState('weight')
   const [otherField, setOtherField] = useState('waist')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -31,45 +32,57 @@ export default function Progress() {
 
   useEffect(() => {
     async function load() {
-      const since = new Date(Date.now() - YEAR_WEEKS * 7 * DAY_MS).toISOString()
+      setLoadError(null)
+      try {
+        const since = new Date(Date.now() - YEAR_WEEKS * 7 * DAY_MS).toISOString()
 
-      const [{ data: loadedWorkouts }, { data: sets }, { data: stats }] = await Promise.all([
-        supabase
-          .from('mf_workouts')
-          .select('started_at, program:mf_programs(color, type, name)')
-          .not('finished_at', 'is', null)
-          .gte('started_at', since)
-          .order('started_at'),
-        supabase
-          .from('mf_workout_sets')
-          .select('exercise_id, weight, reps, created_at, exercise:mf_exercises(name)')
-          .eq('completed', true),
-        supabase
-          .from('mf_body_stats')
-          .select('*')
-          .order('recorded_at', { ascending: false })
-          .limit(24),
-      ])
+        const [
+          { data: loadedWorkouts, error: workoutsError },
+          { data: sets, error: setsError },
+          { data: stats, error: statsError },
+        ] = await Promise.all([
+          supabase
+            .from('mf_workouts')
+            .select('started_at, program:mf_programs(color, type, name)')
+            .not('finished_at', 'is', null)
+            .gte('started_at', since)
+            .order('started_at'),
+          supabase
+            .from('mf_workout_sets')
+            .select('exercise_id, weight, reps, created_at, exercise:mf_exercises(name)')
+            .eq('completed', true),
+          supabase
+            .from('mf_body_stats')
+            .select('*')
+            .order('recorded_at', { ascending: false })
+            .limit(24),
+        ])
+        if (workoutsError || setsError || statsError) throw workoutsError ?? setsError ?? statsError
 
-      setWorkouts(loadedWorkouts ?? [])
-      setBodyStats((stats ?? []).slice().reverse())
+        setWorkouts(loadedWorkouts ?? [])
+        setBodyStats((stats ?? []).slice().reverse())
 
-      const map = {}
-      ;(sets ?? []).forEach(set => {
-        if (!map[set.exercise_id] || set.weight > map[set.exercise_id].weight) {
-          map[set.exercise_id] = {
-            name: set.exercise?.name ?? '—',
-            weight: set.weight,
-            reps: set.reps ?? 0,
-            date: set.created_at,
+        const map = {}
+        ;(sets ?? []).forEach(set => {
+          if (!map[set.exercise_id] || set.weight > map[set.exercise_id].weight) {
+            map[set.exercise_id] = {
+              name: set.exercise?.name ?? '—',
+              weight: set.weight,
+              reps: set.reps ?? 0,
+              date: set.created_at,
+            }
           }
-        }
-      })
-      setRecords(Object.values(map).sort((a, b) => b.weight - a.weight))
-      setLoading(false)
+        })
+        setRecords(Object.values(map).sort((a, b) => b.weight - a.weight))
+      } catch (error) {
+        console.error('loadProgress:', error)
+        setLoadError('Не вдалося завантажити прогрес. Спробуй оновити застосунок.')
+      } finally {
+        setLoading(false)
+      }
     }
 
-    load()
+    void load()
   }, [])
 
   const activeFieldKey = bodyMode === 'weight' ? 'weight_kg' : otherField
@@ -215,6 +228,26 @@ export default function Progress() {
     return (
       <div className="screen">
         <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="screen">
+        <div className="page page-top stack">
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 16,
+            padding: '14px 16px',
+            color: 'var(--danger)',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+            {loadError}
+          </div>
+        </div>
       </div>
     )
   }

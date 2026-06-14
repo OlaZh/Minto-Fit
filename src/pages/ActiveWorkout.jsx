@@ -52,6 +52,7 @@ export default function ActiveWorkout() {
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [program, setProgram] = useState(null)
   const [exercises, setExercises] = useState([])
   const [prevSets, setPrevSets] = useState({})
@@ -136,136 +137,155 @@ export default function ActiveWorkout() {
     }
 
     async function load() {
-      const { data: user } = await supabase.auth.getUser()
-      const uid = user.user.id
+      setLoadError(null)
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        if (userError || !userData?.user?.id) throw userError ?? new Error('No user')
+        const uid = userData.user.id
 
-      const [{ data: prog }, { data: exRows }, { data: lastWorkout }, { data: lastStat }] = await Promise.all([
-        supabase.from('mf_programs').select('*').eq('id', programId).single(),
-        supabase
-          .from('mf_program_exercises')
-          .select('*, exercise:mf_exercises(*)')
-          .eq('program_id', programId)
-          .order('order'),
-        supabase
-          .from('mf_workouts')
-          .select('id')
-          .eq('program_id', programId)
-          .eq('user_id', uid)
-          .not('finished_at', 'is', null)
-          .order('finished_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('mf_body_stats')
-          .select('weight_kg')
-          .eq('user_id', uid)
-          .not('weight_kg', 'is', null)
-          .order('recorded_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ])
+        const [
+          { data: prog, error: progError },
+          { data: exRows, error: exRowsError },
+          { data: lastWorkout, error: lastWorkoutError },
+          { data: lastStat, error: lastStatError },
+        ] = await Promise.all([
+          supabase.from('mf_programs').select('*').eq('id', programId).single(),
+          supabase
+            .from('mf_program_exercises')
+            .select('*, exercise:mf_exercises(*)')
+            .eq('program_id', programId)
+            .order('order'),
+          supabase
+            .from('mf_workouts')
+            .select('id')
+            .eq('program_id', programId)
+            .eq('user_id', uid)
+            .not('finished_at', 'is', null)
+            .order('finished_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('mf_body_stats')
+            .select('weight_kg')
+            .eq('user_id', uid)
+            .not('weight_kg', 'is', null)
+            .order('recorded_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ])
+        if (progError || exRowsError || lastWorkoutError || lastStatError) {
+          throw progError ?? exRowsError ?? lastWorkoutError ?? lastStatError
+        }
+        if (!prog) throw new Error('Program not found')
 
-      if (lastStat?.weight_kg) setBodyWeight(lastStat.weight_kg)
+        if (lastStat?.weight_kg) setBodyWeight(lastStat.weight_kg)
 
-      setProgram(prog)
+        setProgram(prog)
 
-      let prev = {}
-      if (lastWorkout) {
-        const { data: lastSets } = await supabase
-          .from('mf_workout_sets')
-          .select('exercise_id, weight, reps, duration_seconds, set_number')
-          .eq('workout_id', lastWorkout.id)
-          .order('set_number')
-        ;(lastSets ?? []).forEach(set => {
-          if (!prev[set.exercise_id]) prev[set.exercise_id] = []
-          prev[set.exercise_id].push({ weight: set.weight, reps: set.reps, duration: set.duration_seconds })
+        let prev = {}
+        if (lastWorkout) {
+          const { data: lastSets, error: lastSetsError } = await supabase
+            .from('mf_workout_sets')
+            .select('exercise_id, weight, reps, duration_seconds, set_number')
+            .eq('workout_id', lastWorkout.id)
+            .order('set_number')
+          if (lastSetsError) throw lastSetsError
+          ;(lastSets ?? []).forEach(set => {
+            if (!prev[set.exercise_id]) prev[set.exercise_id] = []
+            prev[set.exercise_id].push({ weight: set.weight, reps: set.reps, duration: set.duration_seconds })
+          })
+        }
+        setPrevSets(prev)
+
+        const exList = (exRows ?? []).map(row => {
+          const mode = row.exercise_mode === 'time' ? 'time' : 'reps'
+          const tracksWeight = row.tracks_weight !== false
+          return {
+            exercise: row.exercise,
+            mode,
+            tracksWeight,
+            defaultSets: row.default_sets,
+            defaultReps: row.default_reps,
+            defaultWeight: row.default_weight,
+            defaultDuration: row.default_duration,
+            alternatives: [],
+            // Розминка має сенс лише для силових вправ із вагою.
+            hasWarmup: mode === 'reps' && tracksWeight && (row.default_weight ?? 0) > 0,
+            warmupDone: false,
+            sets: Array.from({ length: row.default_sets }, (_, i) => ({
+              weight: prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
+              reps: prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
+              duration: prev[row.exercise.id]?.[i]?.duration ?? row.default_duration ?? 0,
+              completed: false,
+            })),
+          }
         })
-      }
-      setPrevSets(prev)
 
-      const exList = (exRows ?? []).map(row => {
-        const mode = row.exercise_mode === 'time' ? 'time' : 'reps'
-        const tracksWeight = row.tracks_weight !== false
-        return {
-          exercise: row.exercise,
-          mode,
-          tracksWeight,
-          defaultSets: row.default_sets,
-          defaultReps: row.default_reps,
-          defaultWeight: row.default_weight,
-          defaultDuration: row.default_duration,
-          alternatives: [],
-          // Розминка має сенс лише для силових вправ із вагою.
-          hasWarmup: mode === 'reps' && tracksWeight && (row.default_weight ?? 0) > 0,
-          warmupDone: false,
-          sets: Array.from({ length: row.default_sets }, (_, i) => ({
-            weight: prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
-            reps: prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
-            duration: prev[row.exercise.id]?.[i]?.duration ?? row.default_duration ?? 0,
-            completed: false,
-          })),
+        if (exList.length > 0) {
+          const exIds = exList.map(item => item.exercise.id)
+          const { data: altRows, error: altRowsError } = await supabase
+            .from('mf_alternative_exercises')
+            .select('exercise_id, alt_default_sets, alt_default_reps, alt_default_weight, alt:mf_exercises!alternative_exercise_id(id, name, youtube_url, machine_photo_url, personal_note, description)')
+            .in('exercise_id', exIds)
+          if (altRowsError) throw altRowsError
+
+          if (altRows?.length) {
+            const altMap = {}
+            altRows.forEach(row => {
+              if (!altMap[row.exercise_id]) altMap[row.exercise_id] = []
+              if (row.alt) {
+                altMap[row.exercise_id].push({
+                  ...row.alt,
+                  altDefaultSets: row.alt_default_sets,
+                  altDefaultReps: row.alt_default_reps,
+                  altDefaultWeight: row.alt_default_weight,
+                })
+              }
+            })
+            exList.forEach(item => {
+              item.alternatives = altMap[item.exercise.id] ?? []
+            })
+          }
         }
-      })
 
-      if (exList.length > 0) {
-        const exIds = exList.map(item => item.exercise.id)
-        const { data: altRows } = await supabase
-          .from('mf_alternative_exercises')
-          .select('exercise_id, alt_default_sets, alt_default_reps, alt_default_weight, alt:mf_exercises!alternative_exercise_id(id, name, youtube_url, machine_photo_url, personal_note, description)')
-          .in('exercise_id', exIds)
+        setExercises(exList)
 
-        if (altRows?.length) {
-          const altMap = {}
-          altRows.forEach(row => {
-            if (!altMap[row.exercise_id]) altMap[row.exercise_id] = []
-            if (row.alt) {
-              altMap[row.exercise_id].push({
-                ...row.alt,
-                altDefaultSets: row.alt_default_sets,
-                altDefaultReps: row.alt_default_reps,
-                altDefaultWeight: row.alt_default_weight,
-              })
-            }
-          })
-          exList.forEach(item => {
-            item.alternatives = altMap[item.exercise.id] ?? []
-          })
+        if (!isPreview) {
+          // Підхоплюємо лише свіже незавершене тренування (почате в межах 12 год),
+          // щоб старий "висячий" запис із минулих днів не зливався з новим.
+          const resumeCutoff = new Date(nowMs() - 12 * 60 * 60 * 1000).toISOString()
+          const { data: existingWorkout, error: existingWorkoutError } = await supabase
+            .from('mf_workouts')
+            .select('id, started_at')
+            .eq('user_id', uid)
+            .eq('program_id', programId)
+            .is('finished_at', null)
+            .gte('started_at', resumeCutoff)
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (existingWorkoutError) throw existingWorkoutError
+
+          if (existingWorkout) {
+            // Незавершене тренування вже існує в БД — продовжуємо його.
+            setHasStarted(true)
+            setWorkoutId(existingWorkout.id)
+            startedAtRef.current = new Date(existingWorkout.started_at).getTime()
+            setCurrentWorkout({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at })
+          } else {
+            setHasStarted(false)
+            setWorkoutId(null)
+          }
         }
+      } catch (error) {
+        console.error('loadActiveWorkout:', error)
+        setLoadError('Не вдалося завантажити тренування. Спробуй повернутися і відкрити програму ще раз.')
+      } finally {
+        setLoading(false)
       }
-
-      setExercises(exList)
-
-      if (!isPreview) {
-        // Підхоплюємо лише свіже незавершене тренування (почате в межах 12 год),
-        // щоб старий "висячий" запис із минулих днів не зливався з новим.
-        const resumeCutoff = new Date(nowMs() - 12 * 60 * 60 * 1000).toISOString()
-        const { data: existingWorkout } = await supabase
-          .from('mf_workouts')
-          .select('id, started_at')
-          .eq('user_id', uid)
-          .eq('program_id', programId)
-          .is('finished_at', null)
-          .gte('started_at', resumeCutoff)
-          .order('started_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (existingWorkout) {
-          // Незавершене тренування вже існує в БД — продовжуємо його.
-          setHasStarted(true)
-          setWorkoutId(existingWorkout.id)
-          startedAtRef.current = new Date(existingWorkout.started_at).getTime()
-          setCurrentWorkout({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at })
-        } else {
-          setHasStarted(false)
-          setWorkoutId(null)
-        }
-      }
-
-      setLoading(false)
     }
 
-    load()
+    void load()
   }, [isPreview, navigate, programId])
 
   useEffect(() => {
@@ -625,6 +645,26 @@ export default function ActiveWorkout() {
     return (
       <div className="screen screen--no-nav">
         <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top stack">
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 16,
+            padding: '14px 16px',
+            color: 'var(--danger)',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+            {loadError}
+          </div>
+        </div>
       </div>
     )
   }

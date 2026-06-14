@@ -54,6 +54,7 @@ export default function ProgramEdit() {
   const [existingGroups, setExistingGroups] = useState([])
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(!isNew)
+  const [loadError, setLoadError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [actionError, setActionError] = useState(null)
@@ -64,50 +65,70 @@ export default function ProgramEdit() {
   const [creatingNew, setCreatingNew] = useState(false)
 
   useEffect(() => {
-    supabase.from('mf_programs').select('type, color, id').then(({ data }) => {
-      const unique = [...new Set((data ?? []).map(p => p.type).filter(Boolean))]
-      setExistingGroups(unique)
-      const taken = (data ?? [])
-        .filter(p => p.color && p.id !== id)
-        .map(p => p.color)
-      setUsedColors(taken)
-    })
+    async function loadGroups() {
+      try {
+        const { data, error } = await supabase.from('mf_programs').select('type, color, id')
+        if (error) throw error
+        const unique = [...new Set((data ?? []).map(p => p.type).filter(Boolean))]
+        setExistingGroups(unique)
+        const taken = (data ?? [])
+          .filter(p => p.color && p.id !== id)
+          .map(p => p.color)
+        setUsedColors(taken)
+      } catch (error) {
+        console.error('loadProgramGroups:', error)
+      }
+    }
+
+    void loadGroups()
   }, [id])
 
   useEffect(() => {
     if (!isNew) {
-      Promise.all([
-        supabase.from('mf_programs').select('*').eq('id', id).single(),
-        supabase.from('mf_program_exercises')
-          .select('*, exercise:mf_exercises(id,name,description,about,machine_photo_url)')
-          .eq('program_id', id)
-          .order('order'),
-      ]).then(([{ data: prog }, { data: exs }]) => {
-        if (prog) {
-          setName(prog.name ?? '')
-          setType(prog.type ?? 'основна')
-          setColor(prog.color ?? '')
-          setHasCardio(prog.has_cardio ?? true)
-          setHasCardioFinish(prog.has_cardio_finish ?? false)
-          setActivityType(prog.activity_type ?? 'силове')
+      async function loadProgram() {
+        setLoadError(null)
+        try {
+          const [{ data: prog, error: progError }, { data: exs, error: exsError }] = await Promise.all([
+            supabase.from('mf_programs').select('*').eq('id', id).single(),
+            supabase.from('mf_program_exercises')
+              .select('*, exercise:mf_exercises(id,name,description,about,machine_photo_url)')
+              .eq('program_id', id)
+              .order('order'),
+          ])
+          if (progError || exsError) throw progError ?? exsError
+
+          if (prog) {
+            setName(prog.name ?? '')
+            setType(prog.type ?? 'основна')
+            setColor(prog.color ?? '')
+            setHasCardio(prog.has_cardio ?? true)
+            setHasCardioFinish(prog.has_cardio_finish ?? false)
+            setActivityType(prog.activity_type ?? 'силове')
+          }
+          setExercises((exs ?? []).map(e => ({
+            row_id: e.id,
+            exercise_id: e.exercise.id,
+            name: e.exercise.name,
+            sets:     e.default_sets   != null ? String(e.default_sets)   : '',
+            reps:     e.default_reps   != null ? String(e.default_reps)   : '',
+            weight:   e.default_weight != null ? String(e.default_weight) : '',
+            duration: e.default_duration != null ? String(e.default_duration) : '',
+            mode:     e.exercise_mode ?? 'reps',
+            tracks_weight: e.tracks_weight ?? true,
+            description: e.exercise.description ?? '',
+            about: e.exercise.about ?? '',
+            photo_url: e.exercise.machine_photo_url ?? '',
+          })))
+          setRemovedExerciseRowIds([])
+        } catch (error) {
+          console.error('loadProgramEdit:', error)
+          setLoadError('Не вдалося завантажити програму для редагування. Спробуй повернутися і відкрити її ще раз.')
+        } finally {
+          setLoading(false)
         }
-        setExercises((exs ?? []).map(e => ({
-          row_id: e.id,
-          exercise_id: e.exercise.id,
-          name: e.exercise.name,
-          sets:     e.default_sets   != null ? String(e.default_sets)   : '',
-          reps:     e.default_reps   != null ? String(e.default_reps)   : '',
-          weight:   e.default_weight != null ? String(e.default_weight) : '',
-          duration: e.default_duration != null ? String(e.default_duration) : '',
-          mode:     e.exercise_mode ?? 'reps',
-          tracks_weight: e.tracks_weight ?? true,
-          description: e.exercise.description ?? '',
-          about: e.exercise.about ?? '',
-          photo_url: e.exercise.machine_photo_url ?? '',
-        })))
-        setRemovedExerciseRowIds([])
-        setLoading(false)
-      })
+      }
+
+      void loadProgram()
     }
   }, [id, isNew])
 
@@ -274,6 +295,26 @@ export default function ProgramEdit() {
     return (
       <div className="screen screen--no-nav">
         <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top stack">
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 16,
+            padding: '14px 16px',
+            color: 'var(--danger)',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+            {loadError}
+          </div>
+        </div>
       </div>
     )
   }

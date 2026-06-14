@@ -32,20 +32,30 @@ export default function ProfileSheet({ onClose }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [bodyLoadError, setBodyLoadError] = useState(null)
 
   useEffect(() => {
-    supabase
-      .from('mf_body_stats')
-      .select('*')
-      .order('recorded_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
+    async function loadBodyStats() {
+      setBodyLoadError(null)
+      try {
+        const { data, error } = await supabase
+          .from('mf_body_stats')
+          .select('*')
+          .order('recorded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (error) throw error
         if (!data) return
         const form = {}
         BODY_FIELDS.forEach(f => { form[f.key] = data[f.key] ?? '' })
         setBodyForm(form)
-      })
+      } catch (error) {
+        console.error('loadBodyStats:', error)
+        setBodyLoadError('Не вдалося підтягнути останні заміри.')
+      }
+    }
+
+    void loadBodyStats()
   }, [])
 
   function toggle(key, value, setter) {
@@ -181,6 +191,18 @@ export default function ProfileSheet({ onClose }) {
 
             {bodyOpen && (
               <div className="stack" style={{ gap: 8 }}>
+                {bodyLoadError && (
+                  <div style={{
+                    background: 'rgba(255,181,71,0.08)',
+                    border: '1px solid rgba(255,181,71,0.22)',
+                    borderRadius: 12,
+                    padding: '10px 14px',
+                    fontSize: 12,
+                    color: 'var(--warning)',
+                  }}>
+                    {bodyLoadError}
+                  </div>
+                )}
                 {saveError && (
                   <div style={{
                     background: 'rgba(255,90,95,0.1)',

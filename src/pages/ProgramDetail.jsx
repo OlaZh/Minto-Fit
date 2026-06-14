@@ -32,6 +32,7 @@ export default function ProgramDetail() {
   const [program, setProgram] = useState(null)
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [noteOpen, setNoteOpen] = useState(null)
   const [noteText, setNoteText] = useState('')
   const [editingCell, setEditingCell] = useState(null)
@@ -47,19 +48,27 @@ export default function ProgramDetail() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: prog }, { data: exs }] = await Promise.all([
-        supabase.from('mf_programs').select('*').eq('id', id).single(),
-        supabase
-          .from('mf_program_exercises')
-          .select('*, exercise:mf_exercises(*)')
-          .eq('program_id', id)
-          .order('order'),
-      ])
-      setProgram(prog)
-      setExercises(exs ?? [])
-      setLoading(false)
+      setLoadError(null)
+      try {
+        const [{ data: prog, error: progError }, { data: exs, error: exsError }] = await Promise.all([
+          supabase.from('mf_programs').select('*').eq('id', id).single(),
+          supabase
+            .from('mf_program_exercises')
+            .select('*, exercise:mf_exercises(*)')
+            .eq('program_id', id)
+            .order('order'),
+        ])
+        if (progError || exsError) throw progError ?? exsError
+        setProgram(prog)
+        setExercises(exs ?? [])
+      } catch (error) {
+        console.error('loadProgramDetail:', error)
+        setLoadError('Не вдалося завантажити програму. Спробуй повернутися і відкрити її ще раз.')
+      } finally {
+        setLoading(false)
+      }
     }
-    load()
+    void load()
   }, [id])
 
   function commitField(peId, field, raw) {
@@ -214,6 +223,26 @@ export default function ProgramDetail() {
     return (
       <div className="screen screen--no-nav">
         <div className="page page-top meta">Завантаження...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="screen screen--no-nav">
+        <div className="page page-top stack">
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 16,
+            padding: '14px 16px',
+            color: 'var(--danger)',
+            fontSize: 14,
+            lineHeight: 1.5,
+          }}>
+            {loadError}
+          </div>
+        </div>
       </div>
     )
   }
