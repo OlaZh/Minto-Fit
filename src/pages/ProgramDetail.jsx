@@ -38,6 +38,7 @@ export default function ProgramDetail() {
   const [pending, setPending] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [actionError, setActionError] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [allExercises, setAllExercises] = useState([])
   const [search, setSearch] = useState('')
@@ -117,6 +118,7 @@ export default function ProgramDetail() {
   }
 
   async function addExercise(ex) {
+    setActionError(null)
     if (exercises.some(row => row.exercise.id === ex.id)) {
       setPickerOpen(false)
       return
@@ -128,35 +130,62 @@ export default function ProgramDetail() {
       .insert({ program_id: id, exercise_id: ex.id, order: nextOrder })
       .select('id, order, default_sets, default_reps, default_weight, default_duration')
       .single()
-    if (error) { console.error('addExercise:', error.message); return }
+    if (error) {
+      console.error('addExercise:', error.message)
+      setActionError('Не вдалося додати вправу. Спробуй ще раз.')
+      return
+    }
     const { data: fullEx } = await supabase.from('mf_exercises').select('*').eq('id', ex.id).single()
     setExercises(prev => [...prev, { ...row, exercise: fullEx ?? ex }])
     setPickerOpen(false)
   }
 
   async function createAndAdd(name) {
+    setActionError(null)
     setCreatingNew(true)
-    const { data: user } = await supabase.auth.getUser()
-    const { data: newEx } = await supabase
-      .from('mf_exercises')
-      .insert({ name, user_id: user.user.id })
-      .select('id, name')
-      .single()
-    if (newEx) {
+
+    try {
+      const { data: user } = await supabase.auth.getUser()
+      const { data: newEx, error } = await supabase
+        .from('mf_exercises')
+        .insert({ name, user_id: user.user.id })
+        .select('id, name')
+        .single()
+
+      if (error || !newEx) {
+        throw error ?? new Error('Failed to create exercise')
+      }
+
       setAllExercises(prev => [...prev, newEx])
       await addExercise(newEx)
+    } catch (error) {
+      console.error('createAndAdd:', error)
+      setActionError('Не вдалося створити вправу. Спробуй ще раз.')
+    } finally {
+      setCreatingNew(false)
     }
-    setCreatingNew(false)
   }
 
   async function removeExercise(peId) {
-    await supabase.from('mf_program_exercises').delete().eq('id', peId)
+    setActionError(null)
+    const { error } = await supabase.from('mf_program_exercises').delete().eq('id', peId)
+    if (error) {
+      console.error('removeExercise:', error)
+      setActionError('Не вдалося видалити вправу. Спробуй ще раз.')
+      return
+    }
     setExercises(prev => prev.filter(e => e.id !== peId))
     setPending(prev => { const n = { ...prev }; delete n[peId]; return n })
   }
 
   async function saveDescription(exerciseId, text) {
-    await supabase.from('mf_exercises').update({ description: text }).eq('id', exerciseId)
+    setActionError(null)
+    const { error } = await supabase.from('mf_exercises').update({ description: text }).eq('id', exerciseId)
+    if (error) {
+      console.error('saveDescription:', error)
+      setActionError('Не вдалося зберегти опис. Спробуй ще раз.')
+      return
+    }
     setExercises(prev => prev.map(e =>
       e.exercise.id === exerciseId
         ? { ...e, exercise: { ...e.exercise, description: text } }
@@ -166,7 +195,13 @@ export default function ProgramDetail() {
   }
 
   async function saveNote(exerciseId) {
-    await supabase.from('mf_exercises').update({ personal_note: noteText }).eq('id', exerciseId)
+    setActionError(null)
+    const { error } = await supabase.from('mf_exercises').update({ personal_note: noteText }).eq('id', exerciseId)
+    if (error) {
+      console.error('saveNote:', error)
+      setActionError('Не вдалося зберегти нотатку. Спробуй ще раз.')
+      return
+    }
     setExercises(prev => prev.map(item =>
       item.exercise.id === exerciseId
         ? { ...item, exercise: { ...item.exercise, personal_note: noteText } }
@@ -205,6 +240,19 @@ export default function ProgramDetail() {
       </div>
 
       <div className="page stack">
+        {actionError && (
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontSize: 12,
+            color: 'var(--danger)',
+          }}>
+            {actionError}
+          </div>
+        )}
+
         {saveError && (
           <div style={{
             background: 'rgba(255,90,95,0.1)',

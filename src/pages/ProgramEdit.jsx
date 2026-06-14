@@ -198,8 +198,7 @@ export default function ProgramEdit() {
         machine_photo_url: e.photo_url.trim() || null,
       }
       const { error } = await supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
-      if (error) console.warn('exercise meta update failed:', error.message)
-      return error
+      if (error) throw error
     }
 
     try {
