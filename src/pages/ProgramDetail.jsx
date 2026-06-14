@@ -376,7 +376,7 @@ export default function ProgramDetail() {
           </button>
         ) : (
           <button type="button" className="btn btn-primary btn-block" onClick={() => navigate(`/workout/${id}`, { state: { fromApp: true, preview: true } })}>
-            Переглянути
+            Переглянути програму
           </button>
         )}
       </div>

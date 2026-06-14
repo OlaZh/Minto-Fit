@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import {
+  appendPendingSet,
+  clearCurrentWorkout,
+  clearPendingFinish,
+  clearPendingSetsForWorkout,
+  getCurrentWorkout,
+  setCurrentWorkout,
+  setPendingFinish,
+  syncPendingSetsForWorkout,
+} from '../lib/workoutStorage'
+import {
   IconArrowLeft, IconMore, IconX, IconCheck, IconFlame, IconDumbbell,
   IconCamera, IconPlay, IconNote, IconRotate, IconTired, IconFlex, IconLeaf,
 } from '../components/Icons'
@@ -45,12 +55,16 @@ export default function ActiveWorkout() {
   const [program, setProgram] = useState(null)
   const [exercises, setExercises] = useState([])
   const [prevSets, setPrevSets] = useState({})
+  const [hasStarted, setHasStarted] = useState(false)
   const [workoutId, setWorkoutId] = useState(null)
   const [elapsed, setElapsed] = useState(0)
   const [rest, setRest] = useState(null)
   const [restTotal, setRestTotal] = useState(() => getLS('mf_rest_seconds', 90))
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [finishing, setFinishing] = useState(false)
+  const [sessionError, setSessionError] = useState(null)
   const [selectedMood, setSelectedMood] = useState('нормально')
   const [cardio, setCardio] = useState({ type: 'Еліпс', startedAt: null, elapsedSec: 0, done: false })
   const [cardioFinish, setCardioFinish] = useState({ type: 'Еліпс', startedAt: null, elapsedSec: 0, done: false })
@@ -71,9 +85,6 @@ export default function ActiveWorkout() {
   const startedAtRef = useRef(null)
   const restRef = useRef(null)
   const restStartedAtRef = useRef(null)
-  // Ледаче створення: запис у mf_workouts створюємо лише при першій реальній дії.
-  const workoutSavedRef = useRef(false)
-  const workoutMetaRef = useRef({ id: null, uid: null, startedAt: null })
 
   const isPreview = !!window.history.state?.usr?.preview
 
@@ -108,13 +119,12 @@ export default function ActiveWorkout() {
 
   // Старт / стоп кардіо-таймера. setter — setCardio або setCardioFinish.
   function toggleCardioTimer(setter) {
+    if (isPreview || !hasStarted) return
     setter(c => {
       if (c.startedAt) {
         // Стоп: фіксуємо накопичений час, позначаємо виконаним.
         return { ...c, startedAt: null, elapsedSec: cardioLiveSec(c), done: true }
       }
-      // Старт: кардіо — реальна дія, тож гарантуємо запис тренування в БД.
-      ensureWorkoutSaved()
       return { ...c, startedAt: nowMs(), done: false }
     })
   }
@@ -242,21 +252,13 @@ export default function ActiveWorkout() {
 
         if (existingWorkout) {
           // Незавершене тренування вже існує в БД — продовжуємо його.
-          workoutSavedRef.current = true
-          workoutMetaRef.current = { id: existingWorkout.id, uid, startedAt: existingWorkout.started_at }
+          setHasStarted(true)
           setWorkoutId(existingWorkout.id)
-          localStorage.setItem('mf_current_workout', JSON.stringify({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at }))
+          startedAtRef.current = new Date(existingWorkout.started_at).getTime()
+          setCurrentWorkout({ id: existingWorkout.id, programId, startedAt: existingWorkout.started_at })
         } else {
-          // Ледаче створення: НЕ пишемо в БД зараз. Готуємо лише локальний id/час.
-          // Реальний insert станеться при першій дії (ensureWorkoutSaved).
-          const saved = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
-          const savedIsFresh = saved?.startedAt && (nowMs() - new Date(saved.startedAt).getTime()) < 12 * 60 * 60 * 1000
-          const localId = (saved?.programId === programId && savedIsFresh) ? saved.id : crypto.randomUUID()
-          const startedAt = new Date().toISOString()
-          workoutSavedRef.current = false
-          workoutMetaRef.current = { id: localId, uid, startedAt }
-          setWorkoutId(localId)
-          localStorage.setItem('mf_current_workout', JSON.stringify({ id: localId, programId, startedAt }))
+          setHasStarted(false)
+          setWorkoutId(null)
         }
       }
 
@@ -322,18 +324,19 @@ export default function ActiveWorkout() {
   }, [])
 
   useEffect(() => {
-    if (loading || isPreview) return
-    const savedWorkout = getLS('mf_current_workout', null)
+    if (loading || isPreview || !hasStarted) return
+    const savedWorkout = getCurrentWorkout()
     startedAtRef.current = savedWorkout?.programId === programId && savedWorkout?.startedAt
       ? new Date(savedWorkout.startedAt).getTime()
-      : nowMs()
+      : startedAtRef.current ?? nowMs()
+    setElapsed(Math.floor((nowMs() - startedAtRef.current) / 1000))
     elapsedRef.current = setInterval(() => {
       setElapsed(Math.floor((nowMs() - startedAtRef.current) / 1000))
     }, 1000)
     return () => {
       clearInterval(elapsedRef.current)
     }
-  }, [isPreview, loading, programId])
+  }, [hasStarted, isPreview, loading, programId])
 
   useEffect(() => {
     if (rest === null) {
@@ -360,23 +363,63 @@ export default function ActiveWorkout() {
     return () => clearTimeout(restRef.current)
   }, [rest, restTotal])
 
-  // Створює запис у mf_workouts при першій реальній дії (ледаче створення).
-  // Якщо запис уже існує — нічого не робить.
-  async function ensureWorkoutSaved() {
-    if (workoutSavedRef.current || isPreview) return
-    const { id, uid, startedAt } = workoutMetaRef.current
-    if (!id || !uid) return
-    workoutSavedRef.current = true // ставимо одразу, щоб уникнути подвійного insert
-    const { error } = await supabase
-      .from('mf_workouts')
-      .insert({ id, user_id: uid, program_id: programId, started_at: startedAt })
-    if (error) {
-      // Запис міг уже існувати (race / дубль) — це не критично, лишаємо saved=true.
-      if (error.code !== '23505') {
-        console.error('mf_workouts insert error:', error)
-        workoutSavedRef.current = false // дозволити повторну спробу при наступній дії
+  async function startWorkout() {
+    if (isPreview || hasStarted || starting) return true
+
+    setStarting(true)
+    setSessionError(null)
+
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const startedAt = new Date().toISOString()
+      const { data: createdWorkout, error } = await supabase
+        .from('mf_workouts')
+        .insert({ user_id: userData.user.id, program_id: programId, started_at: startedAt })
+        .select('id, started_at')
+        .single()
+
+      if (error || !createdWorkout?.id) {
+        throw error ?? new Error('Failed to create workout')
       }
+
+      startedAtRef.current = new Date(createdWorkout.started_at).getTime()
+      setElapsed(0)
+      setWorkoutId(createdWorkout.id)
+      setHasStarted(true)
+      setCurrentWorkout({
+        id: createdWorkout.id,
+        programId,
+        startedAt: createdWorkout.started_at,
+      })
+      return true
+    } catch (error) {
+      console.error('startWorkout:', error)
+      setSessionError('Не вдалося почати тренування. Спробуй ще раз.')
+      return false
+    } finally {
+      setStarting(false)
     }
+  }
+
+  async function cancelStartedWorkout() {
+    if (!workoutId) {
+      navigate('/')
+      return
+    }
+
+    setSessionError(null)
+    const { error } = await supabase.from('mf_workouts').delete().eq('id', workoutId)
+    if (error) {
+      console.error('cancelStartedWorkout:', error)
+      setSessionError('Не вдалося скасувати тренування. Спробуй ще раз.')
+      return
+    }
+
+    clearCurrentWorkout()
+    clearPendingSetsForWorkout(workoutId)
+    clearPendingFinish(workoutId)
+    wakeLockRef.current?.release()
+    navigate('/')
   }
 
   function updateSet(exIdx, setIdx, field, value) {
@@ -399,24 +442,14 @@ export default function ActiveWorkout() {
     }))
   }
 
-  function enqueuePendingSet(data) {
-    try {
-      const q = JSON.parse(localStorage.getItem('mf_pending_sets') || '[]')
-      q.push(data)
-      localStorage.setItem('mf_pending_sets', JSON.stringify(q))
-    } catch {
-      /* ignore offline queue write errors */
-    }
-  }
-
   async function completeWarmup(exIdx) {
+    if (isPreview || !hasStarted || !workoutId) return
+
     setExercises(prev => prev.map((ex, i) => (
       i !== exIdx ? ex : { ...ex, warmupDone: true }
     )))
     const restSecs = getLS('mf_rest_seconds', 90)
     startRestTimer(restSecs)
-    if (!workoutId || isPreview) return
-    await ensureWorkoutSaved()
     const ex = exercises[exIdx]
     const displayExercise = replacedExercises[ex.exercise.id] ?? ex.exercise
     const setData = {
@@ -429,7 +462,7 @@ export default function ActiveWorkout() {
       completed: true,
     }
     const { error } = await supabase.from('mf_workout_sets').insert(setData)
-    if (error) enqueuePendingSet(setData)
+    if (error) appendPendingSet(setData)
   }
 
   async function saveNote(exerciseId, text) {
@@ -486,16 +519,15 @@ export default function ActiveWorkout() {
   }
 
   async function completeSet(exIdx, setIdx) {
+    if (isPreview || !hasStarted || !workoutId) return
+
     updateSet(exIdx, setIdx, 'completed', true)
     const restSecs = getLS('mf_rest_seconds', 90)
     startRestTimer(restSecs)
-    if (!workoutId) return
 
     const set = exercises[exIdx].sets[setIdx]
     const displayExercise = replacedExercises[exercises[exIdx].exercise.id] ?? exercises[exIdx].exercise
 
-    if (isPreview) return
-    await ensureWorkoutSaved()
     const exercise = exercises[exIdx]
     const setData = {
       workout_id: workoutId,
@@ -507,72 +539,75 @@ export default function ActiveWorkout() {
       completed: true,
     }
     const { error } = await supabase.from('mf_workout_sets').insert(setData)
-    if (error) enqueuePendingSet(setData)
+    if (error) appendPendingSet(setData)
   }
 
   async function finishWorkout(intensity) {
-    if (!workoutId) return
-
-    // Ледаче створення: якщо за весь сеанс не було жодної реальної дії —
-    // запис у БД не створювався. Нічого не зберігаємо, просто виходимо.
-    if (!workoutSavedRef.current) {
-      localStorage.removeItem('mf_current_workout')
-      localStorage.removeItem('mf_pending_sets')
-      localStorage.removeItem('mf_pending_finish')
-      wakeLockRef.current?.release()
-      navigate('/')
+    if (!hasStarted || !workoutId || finishing) {
       return
     }
 
+    setFinishing(true)
+    setSessionError(null)
+
     try {
-      const pending = JSON.parse(localStorage.getItem('mf_pending_sets') || '[]')
-      if (pending.length > 0) {
-        const { error } = await supabase.from('mf_workout_sets').insert(pending)
-        if (!error) localStorage.removeItem('mf_pending_sets')
+      const pendingSync = await syncPendingSetsForWorkout(supabase, workoutId)
+      if (!pendingSync.ok) {
+        setSessionError('Не вдалося дозберегти підходи. Спробуй завершити тренування ще раз.')
+        return
       }
-    } catch {
-      /* keep pending sets in storage when sync fails */
-    }
-
-    const calories = burnedCalories
-    // Обмежуємо тривалість 6 годинами — захист від кривого elapsed,
-    // якщо started_at виявився старим (підхоплений запис із минулого дня).
-    const durationMinutes = Math.min(360, Math.max(1, Math.round(elapsed / 60)))
-    // Кардіо відбувається в межах загального elapsed, тож не додаємо його зверху —
-    // зберігаємо окремо для статистики/summary.
-    const cardioWarmupMin = Math.round(cardioLiveSec(cardio) / 60)
-    const cardioFinishMin = Math.round(cardioLiveSec(cardioFinish) / 60)
-    const finishData = {
-      id: workoutId,
-      finished_at: new Date().toISOString(),
-      duration_minutes: durationMinutes,
-      intensity,
-      calories_burned: calories,
-      cardio_warmup_minutes: cardioWarmupMin,
-      cardio_finish_minutes: cardioFinishMin,
-    }
-    localStorage.setItem('mf_pending_finish', JSON.stringify(finishData))
-
-    const { error } = await supabase
-      .from('mf_workouts')
-      .update({
-        finished_at: finishData.finished_at,
-        duration_minutes: finishData.duration_minutes,
+      const calories = burnedCalories
+      // Обмежуємо тривалість 6 годинами — захист від кривого elapsed,
+      // якщо started_at виявився старим (підхоплений запис із минулого дня).
+      const durationMinutes = Math.min(360, Math.max(1, Math.round(elapsed / 60)))
+      // Кардіо відбувається в межах загального elapsed, тож не додаємо його зверху —
+      // зберігаємо окремо для статистики/summary.
+      const cardioWarmupMin = Math.round(cardioLiveSec(cardio) / 60)
+      const cardioFinishMin = Math.round(cardioLiveSec(cardioFinish) / 60)
+      const finishData = {
+        id: workoutId,
+        finished_at: new Date().toISOString(),
+        duration_minutes: durationMinutes,
         intensity,
         calories_burned: calories,
         cardio_warmup_minutes: cardioWarmupMin,
         cardio_finish_minutes: cardioFinishMin,
-      })
-      .eq('id', workoutId)
+      }
+      setPendingFinish(finishData)
 
-    if (!error) localStorage.removeItem('mf_pending_finish')
+      const { data: finishedWorkout, error } = await supabase
+        .from('mf_workouts')
+        .update({
+          finished_at: finishData.finished_at,
+          duration_minutes: finishData.duration_minutes,
+          intensity,
+          calories_burned: calories,
+          cardio_warmup_minutes: cardioWarmupMin,
+          cardio_finish_minutes: cardioFinishMin,
+        })
+        .eq('id', workoutId)
+        .select('id')
+        .maybeSingle()
 
-    localStorage.removeItem('mf_current_workout')
-    wakeLockRef.current?.release()
-    navigate('/')
+      if (error || !finishedWorkout?.id) {
+        setSessionError('Не вдалося завершити тренування. Спробуй ще раз.')
+        return
+      }
+
+      clearPendingFinish(workoutId)
+      clearCurrentWorkout()
+      wakeLockRef.current?.release()
+      navigate('/')
+    } catch {
+      setSessionError('Не вдалося дозберегти підходи. Спробуй завершити тренування ще раз.')
+      return
+    } finally {
+      setFinishing(false)
+    }
   }
 
   function requestFinish() {
+    if (!hasStarted || finishing) return
     if (allDone) {
       setSummaryOpen(true)
       return
@@ -607,6 +642,7 @@ export default function ActiveWorkout() {
   const menuDisplayExercise = menuExercise
     ? (replacedExercises[menuExercise.exercise.id] ?? menuExercise.exercise)
     : null
+  const interactionLocked = isPreview || !hasStarted
 
   if (summaryOpen) {
     return (
@@ -617,7 +653,7 @@ export default function ActiveWorkout() {
               <div>
                 <div className="label">Тренування завершено</div>
               </div>
-              <button type="button" className="icon-btn" onClick={() => finishWorkout(selectedMood)}><IconX size={18} /></button>
+              <button type="button" className="icon-btn" onClick={() => finishWorkout(selectedMood)} disabled={finishing}><IconX size={18} /></button>
             </div>
 
             <div className="summary-check" style={{ marginTop: 8 }}><IconCheck size={56} /></div>
@@ -702,15 +738,16 @@ export default function ActiveWorkout() {
             </div>
           )}
 
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            onClick={() => {
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          onClick={() => {
               finishWorkout(selectedMood)
-            }}
-          >
-            На головну
-          </button>
+          }}
+          disabled={finishing}
+        >
+            {finishing ? 'Завершуємо...' : 'На головну'}
+        </button>
         </div>
       </div>
     )
@@ -722,12 +759,11 @@ export default function ActiveWorkout() {
       <div className="topbar" style={{ paddingBottom: 0 }}>
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             if (isPreview) { navigate(-1); return }
-            if (confirm('Скасувати тренування?')) {
-              localStorage.removeItem('mf_current_workout')
-              navigate('/')
-            }
+            if (!hasStarted) { navigate('/'); return }
+            if (!confirm('Скасувати тренування? Усі незбережені зміни буде втрачено.')) return
+            await cancelStartedWorkout()
           }}
           className="icon-btn"
           aria-label="Назад"
@@ -736,22 +772,48 @@ export default function ActiveWorkout() {
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
           <div className="label" style={{ textAlign: 'center' }}>
-            {isPreview ? 'ПЕРЕГЛЯД' : formatProgramTitle(program?.name ?? 'Тренування')}
+            {isPreview
+              ? 'ПЕРЕГЛЯД'
+              : hasStarted
+              ? formatProgramTitle(program?.name ?? 'Тренування')
+              : 'ГОТОВО ДО СТАРТУ'}
           </div>
-          {!isPreview && <div className="num" style={{ fontSize: 18, fontWeight: 700 }}>{fmtTime(elapsed)}</div>}
+          {!isPreview && (
+            hasStarted
+              ? <div className="num" style={{ fontSize: 18, fontWeight: 700 }}>{fmtTime(elapsed)}</div>
+              : <div className="meta" style={{ fontSize: 12 }}>Перевір вправи перед стартом</div>
+          )}
         </div>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Завершити або параметри"
-          onClick={requestFinish}
-        >
-          <IconMore size={20} />
-        </button>
+        {hasStarted && !isPreview ? (
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Завершити або параметри"
+            onClick={requestFinish}
+          >
+            <IconMore size={20} />
+          </button>
+        ) : (
+          <div style={{ width: 38, height: 38 }} />
+        )}
       </div>
 
       <div className="page stack">
-        {!isOnline && !isPreview && (
+        {sessionError && (
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontSize: 12,
+            color: 'var(--danger)',
+            marginBottom: -4,
+          }}>
+            {sessionError}
+          </div>
+        )}
+
+        {!isOnline && hasStarted && !isPreview && (
           <div style={{
             background: 'rgba(255,181,71,0.08)',
             border: '1px solid rgba(255,181,71,0.2)',
@@ -797,7 +859,7 @@ export default function ActiveWorkout() {
           </button>
         )}
 
-        {!isPreview && (
+        {hasStarted && !isPreview && (
           <section className="stack" style={{ gap: 10 }}>
             <div className="progress-strip">
               <div className="progress-strip-fill" style={{ width: `${progress}%` }} />
@@ -816,6 +878,7 @@ export default function ActiveWorkout() {
             setState={setCardio}
             liveSec={cardioLiveSec(cardio)}
             onToggle={() => toggleCardioTimer(setCardio)}
+            disabled={interactionLocked}
           />
         )}
 
@@ -904,6 +967,7 @@ export default function ActiveWorkout() {
                         className="set-check"
                         data-done={exercise.warmupDone ? '1' : '0'}
                         onClick={() => completeWarmup(exerciseIndex)}
+                        disabled={interactionLocked}
                       >
                         {exercise.warmupDone ? <IconCheck size={16} /> : ''}
                       </button>
@@ -943,6 +1007,7 @@ export default function ActiveWorkout() {
                                 type="button"
                                 className="set-edit-btn num"
                                 onClick={() => startEditing(exercise.exercise.id, setIndex, 'weight')}
+                                disabled={interactionLocked}
                               >
                                 {set.weight}
                               </button>
@@ -974,6 +1039,7 @@ export default function ActiveWorkout() {
                               type="button"
                               className="set-edit-btn num"
                               onClick={() => startEditing(exercise.exercise.id, setIndex, valueField)}
+                              disabled={interactionLocked}
                             >
                               {set[valueField] ?? 0}
                             </button>
@@ -984,6 +1050,7 @@ export default function ActiveWorkout() {
                           className="set-check"
                           data-done={set.completed ? '1' : '0'}
                           onClick={() => completeSet(exerciseIndex, setIndex)}
+                          disabled={interactionLocked}
                         >
                           {set.completed ? <IconCheck size={16} /> : ''}
                         </button>
@@ -1009,6 +1076,7 @@ export default function ActiveWorkout() {
                             className="rpe-btn"
                             style={isActive ? { background: bg, borderColor: border, color: 'var(--text)' } : {}}
                             onClick={() => setRpe(prev => ({ ...prev, [exercise.exercise.id]: key }))}
+                            disabled={interactionLocked}
                           >
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, display: 'inline-block', flexShrink: 0 }} />
                             {label}
@@ -1043,6 +1111,7 @@ export default function ActiveWorkout() {
                       color: 'var(--accent)',
                     } : {}}
                     onClick={() => toggleWarmup(exerciseIndex)}
+                    disabled={interactionLocked}
                   >
                     Р
                   </button>
@@ -1050,6 +1119,7 @@ export default function ActiveWorkout() {
                     type="button"
                     className="ex-action-btn"
                     onClick={() => addSet(exerciseIndex)}
+                    disabled={interactionLocked}
                   >
                     + Підхід
                   </button>
@@ -1058,6 +1128,7 @@ export default function ActiveWorkout() {
                       type="button"
                       className="ex-action-btn"
                       onClick={() => removeLastSet(exerciseIndex)}
+                      disabled={interactionLocked}
                     >
                       − Підхід
                     </button>
@@ -1066,6 +1137,7 @@ export default function ActiveWorkout() {
                     <button
                       type="button"
                       className="ex-action-btn"
+                      disabled={interactionLocked}
                       onClick={() => {
                         const alt = exercise.alternatives[0]
                         if (isReplaced) {
@@ -1119,6 +1191,7 @@ export default function ActiveWorkout() {
             setState={setCardioFinish}
             liveSec={cardioLiveSec(cardioFinish)}
             onToggle={() => toggleCardioTimer(setCardioFinish)}
+            disabled={interactionLocked}
           />
         )}
       </div>
@@ -1129,14 +1202,24 @@ export default function ActiveWorkout() {
           <button type="button" className="btn btn-ghost btn-block" onClick={() => navigate(-1)}>
             Закрити перегляд
           </button>
+        ) : !hasStarted ? (
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={() => { void startWorkout() }}
+            disabled={starting}
+          >
+            {starting ? 'Запускаємо...' : 'Почати тренування'}
+          </button>
         ) : (
           <button
             type="button"
             className="btn btn-primary btn-block"
             onClick={requestFinish}
+            disabled={finishing}
             style={{ opacity: 1 }}
           >
-            Завершити тренування
+            {finishing ? 'Завершуємо...' : 'Завершити тренування'}
           </button>
         )}
       </div>
@@ -1343,7 +1426,7 @@ export default function ActiveWorkout() {
 
 const CARDIO_TYPES = ['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер']
 
-function CardioBlock({ title, state, setState, liveSec, onToggle }) {
+function CardioBlock({ title, state, setState, liveSec, onToggle, disabled = false }) {
   const running = !!state.startedAt
   const done = state.done && !running
 
@@ -1365,7 +1448,7 @@ function CardioBlock({ title, state, setState, liveSec, onToggle }) {
             value={state.type}
             onChange={event => setState(value => ({ ...value, type: event.target.value }))}
             className="select-field"
-            disabled={running}
+            disabled={running || disabled}
             style={{ marginTop: 6 }}
           >
             {CARDIO_TYPES.map(option => (
@@ -1397,6 +1480,7 @@ function CardioBlock({ title, state, setState, liveSec, onToggle }) {
           type="button"
           onClick={onToggle}
           className="btn btn-sm"
+          disabled={disabled}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             minWidth: 96, justifyContent: 'center',

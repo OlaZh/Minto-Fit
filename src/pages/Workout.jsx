@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import {
+  clearCurrentWorkout,
+  clearPendingFinish,
+  getCurrentWorkout,
+  getPendingFinish,
+  syncPendingSetsForWorkout,
+} from '../lib/workoutStorage'
 import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconPlay } from '../components/Icons'
 import ProgramGlyph from '../components/ProgramGlyph'
@@ -107,31 +114,45 @@ export default function Workout() {
       const { data: user } = await supabase.auth.getUser()
       const uid = user.user.id
 
-      const pendingFinish = JSON.parse(localStorage.getItem('mf_pending_finish') || 'null')
+      const pendingFinish = getPendingFinish()
       if (pendingFinish?.id) {
-        const { error } = await supabase.from('mf_workouts').update({
-          finished_at: pendingFinish.finished_at,
-          duration_minutes: pendingFinish.duration_minutes,
-          intensity: pendingFinish.intensity,
-          calories_burned: pendingFinish.calories_burned,
-        }).eq('id', pendingFinish.id).is('finished_at', null)
-        if (!error) localStorage.removeItem('mf_pending_finish')
+        const pendingSync = await syncPendingSetsForWorkout(supabase, pendingFinish.id)
+        if (!pendingSync.ok) {
+          console.error('pending finish sync failed:', pendingSync.error)
+        } else {
+          const { error } = await supabase.from('mf_workouts').update({
+            finished_at: pendingFinish.finished_at,
+            duration_minutes: pendingFinish.duration_minutes,
+            intensity: pendingFinish.intensity,
+            calories_burned: pendingFinish.calories_burned,
+            cardio_warmup_minutes: pendingFinish.cardio_warmup_minutes,
+            cardio_finish_minutes: pendingFinish.cardio_finish_minutes,
+          }).eq('id', pendingFinish.id).is('finished_at', null)
+          if (!error) clearPendingFinish(pendingFinish.id)
+        }
       }
 
-      const abandoned = JSON.parse(localStorage.getItem('mf_current_workout') || 'null')
+      const abandoned = getCurrentWorkout()
       if (abandoned?.id && abandoned?.startedAt) {
-        const durationMs = nowMs() - new Date(abandoned.startedAt).getTime()
-        const durationMinutes = Math.round(durationMs / 60000)
-        if (durationMinutes >= 2) {
-          const { error } = await supabase.from('mf_workouts').update({
-            finished_at: new Date().toISOString(),
-            duration_minutes: durationMinutes,
-            intensity: 'нормально',
-            calories_burned: null,
-          }).eq('id', abandoned.id).is('finished_at', null)
-          if (!error) localStorage.removeItem('mf_current_workout')
+        const pendingSync = await syncPendingSetsForWorkout(supabase, abandoned.id)
+        if (!pendingSync.ok) {
+          console.error('abandoned workout pending sync failed:', pendingSync.error)
         } else {
-          localStorage.removeItem('mf_current_workout')
+          const durationMs = nowMs() - new Date(abandoned.startedAt).getTime()
+          const durationMinutes = Math.max(1, Math.round(durationMs / 60000))
+          const { data: recoveredWorkout, error } = await supabase
+            .from('mf_workouts')
+            .update({
+              finished_at: new Date().toISOString(),
+              duration_minutes: durationMinutes,
+              intensity: 'нормально',
+              calories_burned: null,
+            })
+            .eq('id', abandoned.id)
+            .is('finished_at', null)
+            .select('id')
+            .maybeSingle()
+          if (!error && recoveredWorkout?.id) clearCurrentWorkout()
         }
       }
 
@@ -273,7 +294,7 @@ export default function Workout() {
                 onClick={() => navigate(`/workout/${nextProgram.id}`, { state: { fromApp: true } })}
                 style={{ gap: 8, fontSize: 15 }}
               >
-                <IconPlay size={15} /> Розпочати тренування
+                <IconPlay size={15} /> Відкрити програму
               </button>
             </div>
           </div>
