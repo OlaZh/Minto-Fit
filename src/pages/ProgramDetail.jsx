@@ -43,6 +43,8 @@ export default function ProgramDetail() {
   const [saveError, setSaveError] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerError, setPickerError] = useState(null)
   const [allExercises, setAllExercises] = useState([])
   const [search, setSearch] = useState('')
   const [creatingNew, setCreatingNew] = useState(false)
@@ -120,9 +122,19 @@ export default function ProgramDetail() {
   }
 
   async function openPicker() {
+    setPickerError(null)
     if (allExercises.length === 0) {
-      const { data } = await supabase.from('mf_exercises').select('id, name').order('name')
-      setAllExercises(data ?? [])
+      setPickerLoading(true)
+      try {
+        const { data, error } = await supabase.from('mf_exercises').select('id, name').order('name')
+        if (error) throw error
+        setAllExercises(data ?? [])
+      } catch (error) {
+        console.error('openPicker:', error)
+        setPickerError('Не вдалося завантажити список вправ.')
+      } finally {
+        setPickerLoading(false)
+      }
     }
     setSearch('')
     setPickerOpen(true)
@@ -146,7 +158,11 @@ export default function ProgramDetail() {
       setActionError('Не вдалося додати вправу. Спробуй ще раз.')
       return
     }
-    const { data: fullEx } = await supabase.from('mf_exercises').select('*').eq('id', ex.id).single()
+    const { data: fullEx, error: fullExError } = await supabase.from('mf_exercises').select('*').eq('id', ex.id).single()
+    if (fullExError) {
+      console.error('load added exercise:', fullExError)
+      setActionError('Вправу додано, але не вдалося підтягнути її деталі.')
+    }
     setExercises(prev => [...prev, { ...row, exercise: fullEx ?? ex }])
     setPickerOpen(false)
   }
@@ -497,6 +513,17 @@ export default function ProgramDetail() {
                 autoFocus
               />
               <div className="stack" style={{ gap: 6, maxHeight: '50dvh', overflowY: 'auto' }}>
+                {pickerLoading && (
+                  <div className="meta">Завантаження вправ...</div>
+                )}
+                {pickerError && (
+                  <LoadErrorState
+                    message={pickerError}
+                    onRetry={openPicker}
+                    fullScreen={false}
+                    retryLabel="Повторити"
+                  />
+                )}
                 {search.trim() && !allExercises.some(e => e.name.toLowerCase() === search.trim().toLowerCase()) && (
                   <button
                     type="button"
@@ -514,7 +541,7 @@ export default function ProgramDetail() {
                     </div>
                   </button>
                 )}
-                {allExercises
+                {!pickerLoading && !pickerError && allExercises
                   .filter(e => e.name.toLowerCase().includes(search.toLowerCase()))
                   .map(ex => (
                     <button

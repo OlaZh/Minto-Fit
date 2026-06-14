@@ -62,6 +62,8 @@ export default function ProgramEdit() {
   const [actionError, setActionError] = useState(null)
   const [removedExerciseRowIds, setRemovedExerciseRowIds] = useState([])
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerError, setPickerError] = useState(null)
   const [allExercises, setAllExercises] = useState([])
   const [search, setSearch] = useState('')
   const [creatingNew, setCreatingNew] = useState(false)
@@ -135,9 +137,19 @@ export default function ProgramEdit() {
   }, [id, isNew, reloadKey])
 
   async function openPicker() {
+    setPickerError(null)
     if (allExercises.length === 0) {
-      const { data } = await supabase.from('mf_exercises').select('id, name').order('name')
-      setAllExercises(data ?? [])
+      setPickerLoading(true)
+      try {
+        const { data, error } = await supabase.from('mf_exercises').select('id, name').order('name')
+        if (error) throw error
+        setAllExercises(data ?? [])
+      } catch (error) {
+        console.error('openPicker:', error)
+        setPickerError('Не вдалося завантажити список вправ.')
+      } finally {
+        setPickerLoading(false)
+      }
     }
     setSearch('')
     setPickerOpen(true)
@@ -661,6 +673,17 @@ export default function ProgramEdit() {
                 autoFocus
               />
               <div className="stack" style={{ gap: 6, maxHeight: '50dvh', overflowY: 'auto' }}>
+                {pickerLoading && (
+                  <div className="meta">Завантаження вправ...</div>
+                )}
+                {pickerError && (
+                  <LoadErrorState
+                    message={pickerError}
+                    onRetry={openPicker}
+                    fullScreen={false}
+                    retryLabel="Повторити"
+                  />
+                )}
                 {search.trim() && !filtered.some(e => e.name.toLowerCase() === search.trim().toLowerCase()) && (
                   <button
                     type="button"
@@ -678,7 +701,7 @@ export default function ProgramEdit() {
                     </div>
                   </button>
                 )}
-                {filtered.map(ex => (
+                {!pickerLoading && !pickerError && filtered.map(ex => (
                   <button
                     key={ex.id}
                     type="button"
@@ -689,7 +712,7 @@ export default function ProgramEdit() {
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{ex.name}</div>
                   </button>
                 ))}
-                {filtered.length === 0 && !search.trim() && (
+                {!pickerLoading && !pickerError && filtered.length === 0 && !search.trim() && (
                   <div className="meta">Введи назву для пошуку</div>
                 )}
               </div>
