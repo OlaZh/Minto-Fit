@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { IconX, IconBell, IconVibration, IconBrightness, IconStopwatch } from './Icons'
 import { BODY_FIELDS } from '../lib/bodyFields'
+import BodyFigure from './BodyFigure'
 
 const GOALS = [
   { key: 'weight_loss', label: 'Схуднення' },
@@ -26,6 +27,7 @@ export default function ProfileSheet({ onClose }) {
   const [wakeLock, setWakeLock] = useState(() => getLS('mf_wake_lock_enabled', true))
   const [restSeconds, setRestSeconds] = useState(() => getLS('mf_rest_seconds', 90))
   const [bodyForm, setBodyForm] = useState({})
+  const [bodyActiveKey, setBodyActiveKey] = useState(null)
   const [bodyOpen, setBodyOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -165,27 +167,13 @@ export default function ProfileSheet({ onClose }) {
 
             {bodyOpen && (
               <div className="stack" style={{ gap: 8 }}>
-                {BODY_FIELDS.map(f => (
-                  <div
-                    key={f.key}
-                    className="card-row"
-                    style={{ padding: '12px 14px', borderRadius: 14, background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-                  >
-                    <label style={{ color: 'var(--text)', fontSize: 14 }}>{f.label}</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <input
-                        type="number"
-                        step={f.step}
-                        value={bodyForm[f.key] ?? ''}
-                        onChange={e => setBodyForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                        placeholder="—"
-                        className="field"
-                        style={{ width: 72, textAlign: 'right', background: 'transparent', border: 0, paddingRight: 0 }}
-                      />
-                      <span className="meta" style={{ width: 22 }}>{f.unit}</span>
-                    </div>
-                  </div>
-                ))}
+                <BodyFigure
+                  form={bodyForm}
+                  fields={BODY_FIELDS}
+                  activeKey={bodyActiveKey}
+                  onChange={(key, value) => setBodyForm(prev => ({ ...prev, [key]: value }))}
+                  onFocusField={setBodyActiveKey}
+                />
                 <button
                   type="button"
                   className="btn btn-primary btn-block"
