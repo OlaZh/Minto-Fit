@@ -56,6 +56,7 @@ export default function ProgramEdit() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [actionError, setActionError] = useState(null)
   const [removedExerciseRowIds, setRemovedExerciseRowIds] = useState([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [allExercises, setAllExercises] = useState([])
@@ -138,18 +139,27 @@ export default function ProgramEdit() {
   async function createAndAdd() {
     const trimmed = search.trim()
     if (!trimmed) return
+    setActionError(null)
     setCreatingNew(true)
-    const { data: user } = await supabase.auth.getUser()
-    const { data: newEx } = await supabase
-      .from('mf_exercises')
-      .insert({ name: trimmed, user_id: user.user.id })
-      .select('id, name')
-      .single()
-    if (newEx) {
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData?.user?.id) throw userError ?? new Error('No user')
+
+      const { data: newEx, error } = await supabase
+        .from('mf_exercises')
+        .insert({ name: trimmed, user_id: userData.user.id })
+        .select('id, name')
+        .single()
+      if (error || !newEx) throw error ?? new Error('Failed to create exercise')
+
       setAllExercises(prev => [...prev, newEx])
       addExercise(newEx)
+    } catch (error) {
+      console.error('createAndAdd:', error)
+      setActionError('Не вдалося створити вправу. Спробуй ще раз.')
+    } finally {
+      setCreatingNew(false)
     }
-    setCreatingNew(false)
   }
 
   function removeExercise(idx) {
@@ -286,6 +296,18 @@ export default function ProgramEdit() {
       </div>
 
       <div className="page stack">
+        {actionError && (
+          <div style={{
+            fontSize: 12,
+            color: 'var(--danger)',
+            padding: '10px 14px',
+            background: 'rgba(255,90,95,0.08)',
+            borderRadius: 12,
+            border: '1px solid rgba(255,90,95,0.2)',
+          }}>
+            {actionError}
+          </div>
+        )}
 
         <div className="card" style={{ padding: 18 }}>
           <div className="stack" style={{ gap: 14 }}>

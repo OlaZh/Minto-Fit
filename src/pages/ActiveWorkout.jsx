@@ -466,7 +466,13 @@ export default function ActiveWorkout() {
   }
 
   async function saveNote(exerciseId, text) {
-    await supabase.from('mf_exercises').update({ personal_note: text }).eq('id', exerciseId)
+    setSessionError(null)
+    const { error } = await supabase.from('mf_exercises').update({ personal_note: text }).eq('id', exerciseId)
+    if (error) {
+      console.error('saveNote:', error)
+      setSessionError('Не вдалося зберегти нотатку вправи. Спробуй ще раз.')
+      return
+    }
     setExercises(prev => prev.map(item =>
       item.exercise.id === exerciseId
         ? { ...item, exercise: { ...item.exercise, personal_note: text } }

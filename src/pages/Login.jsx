@@ -3,13 +3,20 @@ import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   async function handleGoogle() {
     setLoading(true)
-    await supabase.auth.signInWithOAuth({
+    setError(null)
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
     })
+    if (error) {
+      console.error('handleGoogle:', error)
+      setError('Не вдалося почати вхід через Google. Спробуй ще раз.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -23,6 +30,19 @@ export default function Login() {
               Увійди через Google — застосунок тебе запам'ятає.
             </div>
           </div>
+
+          {error && (
+            <div style={{
+              background: 'rgba(255,90,95,0.1)',
+              border: '1px solid rgba(255,90,95,0.25)',
+              borderRadius: 12,
+              padding: '10px 14px',
+              fontSize: 12,
+              color: 'var(--danger)',
+            }}>
+              {error}
+            </div>
+          )}
 
           <button
             type="button"
