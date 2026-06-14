@@ -1531,17 +1531,36 @@ function CardioBlock({ title, state, setState, liveSec, onToggle, selectDisabled
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="h-3" style={{ fontSize: 15 }}>{title}</div>
-          <select
-            value={state.type}
-            onChange={event => setState(value => ({ ...value, type: event.target.value }))}
-            className="select-field"
-            disabled={running || selectDisabled}
-            style={{ marginTop: 6 }}
-          >
-            {CARDIO_TYPES.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <select
+              value={state.type}
+              onChange={event => setState(value => ({ ...value, type: event.target.value }))}
+              className="select-field"
+              disabled={running || selectDisabled}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              {CARDIO_TYPES.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onToggle}
+              className="btn btn-sm"
+              disabled={actionDisabled}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                minWidth: 96, justifyContent: 'center', flexShrink: 0,
+                background: running ? 'var(--danger, #ff5a5f)' : done ? 'var(--surface-2)' : 'var(--accent)',
+                color: running ? '#fff' : done ? 'var(--text-2)' : 'var(--accent-text)',
+                border: done ? '1px solid var(--border)' : 'none',
+                fontWeight: 600,
+              }}
+            >
+              {btnIcon}
+              {btnLabel}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1563,23 +1582,6 @@ function CardioBlock({ title, state, setState, liveSec, onToggle, selectDisabled
             {fmtTime(liveSec)}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="btn btn-sm"
-          disabled={actionDisabled}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            minWidth: 96, justifyContent: 'center',
-            background: running ? 'var(--danger, #ff5a5f)' : done ? 'var(--surface-2)' : 'var(--accent)',
-            color: running ? '#fff' : done ? 'var(--text-2)' : 'var(--accent-text)',
-            border: done ? '1px solid var(--border)' : 'none',
-            fontWeight: 600,
-          }}
-        >
-          {btnIcon}
-          {btnLabel}
-        </button>
       </div>
     </div>
   )
