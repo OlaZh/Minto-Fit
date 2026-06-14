@@ -8,6 +8,7 @@ import {
   clearPendingFinish,
   clearPendingSetsForWorkout,
   getCurrentWorkout,
+  getPendingSetsForWorkout,
   setCurrentWorkout,
   setPendingFinish,
   syncPendingSetsForWorkout,
@@ -184,6 +185,46 @@ export default function ActiveWorkout() {
 
         setProgram(prog)
 
+        let existingWorkout = null
+        let currentSetMap = {}
+        if (!isPreview) {
+          // Підхоплюємо лише свіже незавершене тренування, щоб старий запис не залипав у новий вхід.
+          const resumeCutoff = new Date(nowMs() - 12 * 60 * 60 * 1000).toISOString()
+          const { data: unfinishedWorkout, error: existingWorkoutError } = await supabase
+            .from('mf_workouts')
+            .select('id, started_at')
+            .eq('user_id', uid)
+            .eq('program_id', programId)
+            .is('finished_at', null)
+            .gte('started_at', resumeCutoff)
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (existingWorkoutError) throw existingWorkoutError
+
+          existingWorkout = unfinishedWorkout
+
+          if (existingWorkout?.id) {
+            const { data: dbSets, error: currentSetsError } = await supabase
+              .from('mf_workout_sets')
+              .select('id, exercise_id, weight, reps, duration_seconds, set_number, completed')
+              .eq('workout_id', existingWorkout.id)
+              .order('set_number')
+            if (currentSetsError) throw currentSetsError
+
+            const mergedSets = [
+              ...(dbSets ?? []),
+              ...getPendingSetsForWorkout(existingWorkout.id),
+            ]
+
+            mergedSets.forEach(set => {
+              if (!set?.exercise_id) return
+              if (!currentSetMap[set.exercise_id]) currentSetMap[set.exercise_id] = {}
+              currentSetMap[set.exercise_id][set.set_number] = set
+            })
+          }
+        }
+
         let prev = {}
         if (lastWorkout) {
           const { data: lastSets, error: lastSetsError } = await supabase
@@ -202,6 +243,9 @@ export default function ActiveWorkout() {
         const exList = (exRows ?? []).map(row => {
           const mode = row.exercise_mode === 'time' ? 'time' : 'reps'
           const tracksWeight = row.tracks_weight !== false
+          const resumedSets = currentSetMap[row.exercise.id] ?? {}
+          const resumedWorkSets = Object.values(resumedSets).filter(set => set.set_number > 0)
+          const totalSetCount = Math.max(row.default_sets, resumedWorkSets.length)
           return {
             exercise: row.exercise,
             mode,
@@ -213,13 +257,16 @@ export default function ActiveWorkout() {
             alternatives: [],
             // Розминка має сенс лише для силових вправ із вагою.
             hasWarmup: mode === 'reps' && tracksWeight && (row.default_weight ?? 0) > 0,
-            warmupDone: false,
-            sets: Array.from({ length: row.default_sets }, (_, i) => ({
-              weight: prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
-              reps: prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
-              duration: prev[row.exercise.id]?.[i]?.duration ?? row.default_duration ?? 0,
-              completed: false,
-            })),
+            warmupDone: !!resumedSets[0]?.completed,
+            sets: Array.from({ length: totalSetCount }, (_, i) => {
+              const resumedSet = resumedSets[i + 1]
+              return {
+                weight: resumedSet?.weight ?? prev[row.exercise.id]?.[i]?.weight ?? row.default_weight,
+                reps: resumedSet?.reps ?? prev[row.exercise.id]?.[i]?.reps ?? row.default_reps,
+                duration: resumedSet?.duration_seconds ?? prev[row.exercise.id]?.[i]?.duration ?? row.default_duration ?? 0,
+                completed: resumedSet?.completed ?? false,
+              }
+            }),
           }
         })
 
@@ -253,23 +300,8 @@ export default function ActiveWorkout() {
         setExercises(exList)
 
         if (!isPreview) {
-          // Підхоплюємо лише свіже незавершене тренування (почате в межах 12 год),
-          // щоб старий "висячий" запис із минулих днів не зливався з новим.
-          const resumeCutoff = new Date(nowMs() - 12 * 60 * 60 * 1000).toISOString()
-          const { data: existingWorkout, error: existingWorkoutError } = await supabase
-            .from('mf_workouts')
-            .select('id, started_at')
-            .eq('user_id', uid)
-            .eq('program_id', programId)
-            .is('finished_at', null)
-            .gte('started_at', resumeCutoff)
-            .order('started_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (existingWorkoutError) throw existingWorkoutError
-
           if (existingWorkout) {
-            // Незавершене тренування вже існує в БД — продовжуємо його.
+            // Незавершене тренування вже існує в БД — продовжуємо його разом із записаними сетами.
             setHasStarted(true)
             setWorkoutId(existingWorkout.id)
             startedAtRef.current = new Date(existingWorkout.started_at).getTime()
@@ -457,6 +489,13 @@ export default function ActiveWorkout() {
     )))
   }
 
+  async function persistWorkoutSet(setData) {
+    const { error } = await supabase
+      .from('mf_workout_sets')
+      .upsert(setData, { onConflict: 'id', ignoreDuplicates: true })
+    if (error) appendPendingSet(setData)
+  }
+
   function removeLastSet(exIdx) {
     setExercises(prev => prev.map((exercise, i) => {
       if (i !== exIdx || exercise.sets.length <= 1) return exercise
@@ -475,6 +514,7 @@ export default function ActiveWorkout() {
     const ex = exercises[exIdx]
     const displayExercise = replacedExercises[ex.exercise.id] ?? ex.exercise
     const setData = {
+      id: crypto.randomUUID(),
       workout_id: workoutId,
       exercise_id: displayExercise.id,
       set_number: 0,
@@ -483,8 +523,7 @@ export default function ActiveWorkout() {
       duration_seconds: 0,
       completed: true,
     }
-    const { error } = await supabase.from('mf_workout_sets').insert(setData)
-    if (error) appendPendingSet(setData)
+    await persistWorkoutSet(setData)
   }
 
   async function saveNote(exerciseId, text) {
@@ -558,6 +597,7 @@ export default function ActiveWorkout() {
 
     const exercise = exercises[exIdx]
     const setData = {
+      id: crypto.randomUUID(),
       workout_id: workoutId,
       exercise_id: displayExercise.id,
       set_number: setIdx + 1,
@@ -566,8 +606,7 @@ export default function ActiveWorkout() {
       duration_seconds: exercise.mode === 'time' ? (set.duration ?? 0) : 0,
       completed: true,
     }
-    const { error } = await supabase.from('mf_workout_sets').insert(setData)
-    if (error) appendPendingSet(setData)
+    await persistWorkoutSet(setData)
   }
 
   async function finishWorkout(intensity) {

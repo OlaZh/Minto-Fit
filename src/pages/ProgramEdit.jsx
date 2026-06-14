@@ -60,7 +60,6 @@ export default function ProgramEdit() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [actionError, setActionError] = useState(null)
-  const [removedExerciseRowIds, setRemovedExerciseRowIds] = useState([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerLoading, setPickerLoading] = useState(false)
   const [pickerError, setPickerError] = useState(null)
@@ -110,7 +109,6 @@ export default function ProgramEdit() {
             setActivityType(prog.activity_type ?? 'силове')
           }
           setExercises((exs ?? []).map(e => ({
-            row_id: e.id,
             exercise_id: e.exercise.id,
             name: e.exercise.name,
             sets:     e.default_sets   != null ? String(e.default_sets)   : '',
@@ -123,7 +121,6 @@ export default function ProgramEdit() {
             about: e.exercise.about ?? '',
             photo_url: e.exercise.machine_photo_url ?? '',
           })))
-          setRemovedExerciseRowIds([])
         } catch (error) {
           console.error('loadProgramEdit:', error)
           setLoadError('Не вдалося завантажити програму для редагування. Спробуй повернутися і відкрити її ще раз.')
@@ -141,7 +138,10 @@ export default function ProgramEdit() {
     if (allExercises.length === 0) {
       setPickerLoading(true)
       try {
-        const { data, error } = await supabase.from('mf_exercises').select('id, name').order('name')
+        const { data, error } = await supabase
+          .from('mf_exercises')
+          .select('id, name, description, about, machine_photo_url')
+          .order('name')
         if (error) throw error
         setAllExercises(data ?? [])
       } catch (error) {
@@ -158,7 +158,6 @@ export default function ProgramEdit() {
   function addExercise(ex) {
     if (!exercises.find(e => e.exercise_id === ex.id)) {
       setExercises(prev => [...prev, {
-        row_id: null,
         exercise_id: ex.id,
         name: ex.name,
         sets: '', reps: '', weight: '', duration: '',
@@ -198,17 +197,29 @@ export default function ProgramEdit() {
   }
 
   function removeExercise(idx) {
-    setExercises(prev => {
-      const target = prev[idx]
-      if (target?.row_id) {
-        setRemovedExerciseRowIds(ids => ids.includes(target.row_id) ? ids : [...ids, target.row_id])
-      }
-      return prev.filter((_, i) => i !== idx)
-    })
+    setExercises(prev => prev.filter((_, i) => i !== idx))
   }
 
   function updateField(idx, field, value) {
     setExercises(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e))
+  }
+
+  function buildExercisePayload(exercise) {
+    const mode = exercise.mode === 'time' ? 'time' : 'reps'
+    const tracksWeight = exercise.tracks_weight !== false
+
+    return {
+      exercise_id: exercise.exercise_id,
+      sets: toNum(exercise.sets),
+      reps: mode === 'time' ? null : toNum(exercise.reps),
+      weight: tracksWeight ? toNum(exercise.weight) : null,
+      duration: mode === 'time' ? toNum(exercise.duration) : null,
+      mode,
+      tracks_weight: tracksWeight,
+      description: exercise.description.trim(),
+      about: exercise.about.trim(),
+      photo_url: exercise.photo_url.trim(),
+    }
   }
 
   async function save() {
@@ -216,93 +227,25 @@ export default function ProgramEdit() {
     setSaving(true)
     setSaveError(null)
 
-    const buildRow = (e, i, progId) => {
-      const mode = e.mode === 'time' ? 'time' : 'reps'
-      const tracksWeight = e.tracks_weight !== false
-      const row = {
-        program_id: progId,
-        exercise_id: e.exercise_id,
-        order: i + 1,
-        exercise_mode: mode,
-        tracks_weight: tracksWeight,
-      }
-      if (toNum(e.sets) !== null) row.default_sets = toNum(e.sets)
-      if (mode === 'time') {
-        if (toNum(e.duration) !== null) row.default_duration = toNum(e.duration)
-      } else {
-        if (toNum(e.reps) !== null) row.default_reps = toNum(e.reps)
-      }
-      if (tracksWeight && toNum(e.weight) !== null) row.default_weight = toNum(e.weight)
-      return row
-    }
-
-    const saveExerciseMeta = async (e) => {
-      const patch = {
-        description: e.description.trim() || null,
-        about: e.about.trim() || null,
-        machine_photo_url: e.photo_url.trim() || null,
-      }
-      const { error } = await supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
-      if (error) throw error
-    }
-
     try {
-      if (isNew) {
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: prog, error: progErr } = await supabase
-          .from('mf_programs')
-          .insert({ name: name.trim(), type, color, has_cardio: hasCardio, has_cardio_finish: hasCardioFinish, activity_type: activityType, user_id: user.id })
-          .select()
-          .single()
-        if (progErr) throw new Error(progErr.message)
+      const { data: programId, error } = await supabase.rpc('mf_save_program_atomic', {
+        p_program_id: isNew ? null : id,
+        p_name: name.trim(),
+        p_type: type.trim(),
+        p_color: color,
+        p_has_cardio: hasCardio,
+        p_has_cardio_finish: hasCardioFinish,
+        p_activity_type: activityType,
+        p_exercises: exercises.map(buildExercisePayload),
+      })
+      if (error || !programId) throw error ?? new Error('Не вдалося зберегти програму.')
 
-        const rows = exercises.map((e, i) => buildRow(e, i, prog.id))
-        const { error: exErr } = rows.length
-          ? await supabase.from('mf_program_exercises').insert(rows)
-          : { error: null }
-        if (exErr) throw new Error(exErr.message)
-
-        await Promise.all(exercises.map(saveExerciseMeta))
-        navigate(`/programs/${prog.id}`)
-      } else {
-        const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color, has_cardio: hasCardio, has_cardio_finish: hasCardioFinish, activity_type: activityType }).eq('id', id)
-        if (updErr) throw new Error(updErr.message)
-
-        const indexedExercises = exercises.map((exercise, index) => ({ exercise, index }))
-        const existingRows = indexedExercises.filter(({ exercise }) => exercise.row_id)
-        const newRows = indexedExercises
-          .filter(({ exercise }) => !exercise.row_id)
-          .map(({ exercise, index }) => buildRow(exercise, index, id))
-
-        const updateResults = await Promise.all(
-          existingRows.map(({ exercise, index }) =>
-            supabase
-              .from('mf_program_exercises')
-              .update(buildRow(exercise, index, id))
-              .eq('id', exercise.row_id)
-          )
-        )
-        const updateError = updateResults.find(result => result.error)?.error
-        if (updateError) throw new Error(updateError.message)
-
-        if (newRows.length > 0) {
-          const { error: insertErr } = await supabase.from('mf_program_exercises').insert(newRows)
-          if (insertErr) throw new Error(insertErr.message)
-        }
-
-        if (removedExerciseRowIds.length > 0) {
-          const { error: deleteErr } = await supabase.from('mf_program_exercises').delete().in('id', removedExerciseRowIds)
-          if (deleteErr) throw new Error(deleteErr.message)
-        }
-
-        await Promise.all(exercises.map(saveExerciseMeta))
-        navigate(`/programs/${id}`)
-      }
+      navigate(`/programs/${programId}`)
     } catch (err) {
-      setSaveError(err.message || 'Помилка збереження')
+      setSaveError(err?.message || 'Помилка збереження')
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
   }
 
   if (loading) {
@@ -651,7 +594,7 @@ export default function ProgramEdit() {
           type="button"
           className="btn btn-primary btn-block"
           onClick={save}
-          disabled={saving || !name.trim()}
+          disabled={saving || !name.trim() || !color}
         >
           {saving ? 'Зберігаємо...' : 'Зберегти програму'}
         </button>

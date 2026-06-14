@@ -45,8 +45,9 @@ export function getPendingSets() {
 
 export function appendPendingSet(setData) {
   const pendingSets = getPendingSets()
-  pendingSets.push(setData)
-  writeJson('mf_pending_sets', pendingSets)
+  const nextPendingSets = pendingSets.filter(item => item?.id !== setData?.id)
+  nextPendingSets.push(setData)
+  writeJson('mf_pending_sets', nextPendingSets)
 }
 
 export function getPendingSetsForWorkout(workoutId) {
@@ -66,7 +67,9 @@ export async function syncPendingSetsForWorkout(supabase, workoutId) {
     return { ok: true, syncedCount: 0 }
   }
 
-  const { error } = await supabase.from('mf_workout_sets').insert(pendingSets)
+  const { error } = await supabase
+    .from('mf_workout_sets')
+    .upsert(pendingSets, { onConflict: 'id', ignoreDuplicates: true })
   if (error) {
     return { ok: false, error, syncedCount: 0 }
   }
