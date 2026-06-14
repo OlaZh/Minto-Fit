@@ -188,21 +188,24 @@ export default function ActiveWorkout() {
         let existingWorkout = null
         let currentSetMap = {}
         if (!isPreview) {
-          // Підхоплюємо лише свіже незавершене тренування, щоб старий запис не залипав у новий вхід.
-          const resumeCutoff = new Date(nowMs() - 12 * 60 * 60 * 1000).toISOString()
-          const { data: unfinishedWorkout, error: existingWorkoutError } = await supabase
-            .from('mf_workouts')
-            .select('id, started_at')
-            .eq('user_id', uid)
-            .eq('program_id', programId)
-            .is('finished_at', null)
-            .gte('started_at', resumeCutoff)
-            .order('started_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (existingWorkoutError) throw existingWorkoutError
+          // Підхоплюємо САМЕ те тренування, яке користувач свідомо продовжує
+          // (mf_current_workout для цієї програми), а не «найсвіжіше за N годин».
+          // Без часових евристик — є явний слід або нема.
+          const tracked = getCurrentWorkout()
+          if (tracked?.id && tracked.programId === programId) {
+            const { data: unfinishedWorkout, error: existingWorkoutError } = await supabase
+              .from('mf_workouts')
+              .select('id, started_at')
+              .eq('id', tracked.id)
+              .eq('user_id', uid)
+              .is('finished_at', null)
+              .maybeSingle()
+            if (existingWorkoutError) throw existingWorkoutError
 
-          existingWorkout = unfinishedWorkout
+            // Слід застарів (запис уже завершено або видалено) — починаємо заново.
+            if (!unfinishedWorkout?.id) clearCurrentWorkout()
+            existingWorkout = unfinishedWorkout
+          }
 
           if (existingWorkout?.id) {
             const { data: dbSets, error: currentSetsError } = await supabase

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import {
   clearCurrentWorkout,
   clearPendingFinish,
+  clearPendingSetsForWorkout,
   getCurrentWorkout,
   getPendingFinish,
   syncPendingSetsForWorkout,
@@ -59,6 +60,15 @@ function nowMs() {
   return new Date().getTime()
 }
 
+function formatStartedAt(dateStr) {
+  const d = new Date(dateStr)
+  const isToday = d.toDateString() === new Date().toDateString()
+  const time = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return `Почато сьогодні о ${time}`
+  const day = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
+  return `Почато ${day} о ${time}`
+}
+
 export default function Workout() {
   const [programs, setPrograms] = useState([])
   const [nextProgram, setNextProgram] = useState(null)
@@ -71,6 +81,8 @@ export default function Workout() {
   const [reloadKey, setReloadKey] = useState(0)
   const [profileOpen, setProfileOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [unfinished, setUnfinished] = useState(null)
+  const [recovering, setRecovering] = useState(false)
   const touchStartX = useRef(null)
   const initialWeekStartRef = useRef(getWeekDays(0)[0])
   const navigate = useNavigate()
@@ -119,6 +131,71 @@ export default function Workout() {
     }
   }
 
+  // Продовжити незавершене тренування: ведемо на активний екран тієї ж
+  // програми (НЕ preview) — там resume сам підхопить запис по workout_id.
+  function resumeUnfinished() {
+    if (!unfinished?.programId) return
+    navigate(`/workout/${unfinished.programId}`)
+  }
+
+  // Завершити незавершене тренування свідомо: ставимо finished_at = зараз,
+  // тривалість = реальний проміжок від старту. Не чіпаємо локальний стан,
+  // поки БД не підтвердила оновлення.
+  async function finishUnfinished() {
+    if (!unfinished?.id || recovering) return
+    setRecovering(true)
+    try {
+      const sync = await syncPendingSetsForWorkout(supabase, unfinished.id)
+      if (!sync.ok) throw sync.error ?? new Error('pending sync failed')
+
+      const durationMs = nowMs() - new Date(unfinished.startedAt).getTime()
+      const durationMinutes = Math.max(1, Math.round(durationMs / 60000))
+      const { data: finished, error } = await supabase
+        .from('mf_workouts')
+        .update({ finished_at: new Date().toISOString(), duration_minutes: durationMinutes })
+        .eq('id', unfinished.id)
+        .is('finished_at', null)
+        .select('id')
+        .maybeSingle()
+      if (error) throw error
+
+      if (finished?.id) clearCurrentWorkout()
+      setUnfinished(null)
+      setReloadKey(value => value + 1)
+    } catch (error) {
+      console.error('finishUnfinished:', error)
+      setLoadError('Не вдалося завершити незавершене тренування. Спробуй ще раз.')
+    } finally {
+      setRecovering(false)
+    }
+  }
+
+  // Скасувати незавершене тренування: явний DELETE запису в БД + чистка
+  // локального стану й pending-сетів. Не лишаємо висячих finished_at = null.
+  async function cancelUnfinished() {
+    if (!unfinished?.id || recovering) return
+    setRecovering(true)
+    try {
+      const { error } = await supabase
+        .from('mf_workouts')
+        .delete()
+        .eq('id', unfinished.id)
+        .is('finished_at', null)
+      if (error) throw error
+
+      clearPendingSetsForWorkout(unfinished.id)
+      clearPendingFinish(unfinished.id)
+      clearCurrentWorkout()
+      setUnfinished(null)
+      setReloadKey(value => value + 1)
+    } catch (error) {
+      console.error('cancelUnfinished:', error)
+      setLoadError('Не вдалося скасувати незавершене тренування. Спробуй ще раз.')
+    } finally {
+      setRecovering(false)
+    }
+  }
+
   useEffect(() => {
     async function loadAll() {
       setLoadError(null)
@@ -145,27 +222,30 @@ export default function Workout() {
           }
         }
 
-        const abandoned = getCurrentWorkout()
-        if (abandoned?.id && abandoned?.startedAt) {
-          const pendingSync = await syncPendingSetsForWorkout(supabase, abandoned.id)
-          if (!pendingSync.ok) {
-            console.error('abandoned workout pending sync failed:', pendingSync.error)
+        // Незавершене тренування НЕ закриваємо тихо. Лише перевіряємо, що воно
+        // справді існує в БД і ще не фінішоване, і пропонуємо явний вибір
+        // (Продовжити / Завершити / Скасувати) — див. модалку нижче.
+        const current = getCurrentWorkout()
+        if (current?.id && current?.startedAt) {
+          const { data: liveWorkout, error: liveError } = await supabase
+            .from('mf_workouts')
+            .select('id, program_id, started_at, finished_at, program:mf_programs(name, color)')
+            .eq('id', current.id)
+            .maybeSingle()
+
+          if (liveError) {
+            console.error('unfinished workout check failed:', liveError)
+          } else if (liveWorkout?.id && !liveWorkout.finished_at) {
+            setUnfinished({
+              id: liveWorkout.id,
+              programId: liveWorkout.program_id ?? current.programId,
+              startedAt: liveWorkout.started_at ?? current.startedAt,
+              programName: liveWorkout.program?.name ?? 'Тренування',
+              color: liveWorkout.program?.color ?? '#22c55e',
+            })
           } else {
-            const durationMs = nowMs() - new Date(abandoned.startedAt).getTime()
-            const durationMinutes = Math.max(1, Math.round(durationMs / 60000))
-            const { data: recoveredWorkout, error } = await supabase
-              .from('mf_workouts')
-              .update({
-                finished_at: new Date().toISOString(),
-                duration_minutes: durationMinutes,
-                intensity: 'нормально',
-                calories_burned: null,
-              })
-              .eq('id', abandoned.id)
-              .is('finished_at', null)
-              .select('id')
-              .maybeSingle()
-            if (!error && recoveredWorkout?.id) clearCurrentWorkout()
+            // Запис уже фінішований або зник у БД — локальний слід не потрібен.
+            clearCurrentWorkout()
           }
         }
 
@@ -489,6 +569,46 @@ export default function Workout() {
       )}
 
       {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} />}
+
+      {unfinished && (
+        <div className="sheet-backdrop">
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="stack" style={{ gap: 6 }}>
+              <div className="label" style={{ color: unfinished.color }}>Незавершене тренування</div>
+              <div className="h-3">{unfinished.programName}</div>
+              <div className="meta" style={{ marginTop: 2 }}>{formatStartedAt(unfinished.startedAt)}</div>
+            </div>
+
+            <div className="stack" style={{ gap: 10, marginTop: 20 }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={recovering}
+                onClick={resumeUnfinished}
+              >
+                Продовжити
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={recovering}
+                onClick={finishUnfinished}
+              >
+                Завершити
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={recovering}
+                onClick={cancelUnfinished}
+                style={{ color: 'var(--danger, #ef4444)' }}
+              >
+                Скасувати
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

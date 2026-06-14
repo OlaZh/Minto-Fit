@@ -1312,3 +1312,142 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ── Перемикач Графік / Таблиця ── */
+.seg-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.seg-toggle-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.seg-toggle-btn[data-active='1'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ── Пілси-іконки вибору показника ── */
+.measure-pills {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 8px;
+  margin-top: 20px;
+}
+
+.measure-pill {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.measure-pill-dot {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.measure-pill:active .measure-pill-dot {
+  transform: scale(0.93);
+}
+
+.measure-pill[data-active='1'] .measure-pill-dot {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(77, 207, 160, 0.3);
+}
+
+.measure-pill-label {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.measure-pill[data-active='1'] .measure-pill-label {
+  color: var(--text);
+}
+
+/* ── Таблиця замірів (як ексель) ── */
+.measure-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.measure-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 13px;
+}
+
+.measure-table th,
+.measure-table td {
+  padding: 14px 16px;
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.measure-table th {
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+
+.measure-table td {
+  color: var(--text-2);
+}
+
+.measure-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.measure-table th:last-child,
+.measure-table td:last-child {
+  border-right: 0;
+}
+
+/* Липка колонка дати зліва */
+.measure-table-date {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left !important;
+  font-weight: 600;
+  color: var(--text-2) !important;
+  background: var(--surface-3) !important;
+}
+
+.measure-table thead .measure-table-date {
+  color: var(--text-3) !important;
+}

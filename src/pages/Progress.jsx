@@ -2,10 +2,26 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import LoadErrorState from '../components/LoadErrorState'
 import ProfileSheet from '../components/ProfileSheet'
-import { IconUser, IconTrophy, IconX } from '../components/Icons'
-import { BODY_FIELDS } from '../lib/bodyFields'
+import {
+  IconUser, IconTrophy, IconX,
+  IconBodyWeight, IconBodyChest, IconBodyWaist, IconBodyThigh,
+  IconBodyNeck, IconBodyGlutes, IconBodyBiceps, IconBodyCalf,
+} from '../components/Icons'
+import { BODY_FIELDS, CHART_FIELDS } from '../lib/bodyFields'
 
 const DAY_MS = 86400000
+
+// Мапінг ключа іконки (з CHART_FIELDS.icon) на компонент.
+const BODY_ICONS = {
+  weight: IconBodyWeight,
+  chest: IconBodyChest,
+  waist: IconBodyWaist,
+  thigh: IconBodyThigh,
+  neck: IconBodyNeck,
+  glutes: IconBodyGlutes,
+  biceps: IconBodyBiceps,
+  calf: IconBodyCalf,
+}
 
 function formatRecordDate(dateStr) {
   if (!dateStr) return '—'
@@ -25,8 +41,8 @@ export default function Progress() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const [bodyMode, setBodyMode] = useState('weight')
-  const [otherField, setOtherField] = useState('waist')
+  const [chartView, setChartView] = useState('graph') // 'graph' | 'table'
+  const [activeFieldKey, setActiveFieldKey] = useState('weight_kg')
   const [profileOpen, setProfileOpen] = useState(false)
   const [trackerOpen, setTrackerOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
@@ -87,7 +103,6 @@ export default function Progress() {
     void load()
   }, [reloadKey])
 
-  const activeFieldKey = bodyMode === 'weight' ? 'weight_kg' : otherField
   const activeField = BODY_FIELDS.find(field => field.key === activeFieldKey) ?? BODY_FIELDS[0]
 
   const now = new Date()
@@ -226,6 +241,12 @@ export default function Progress() {
     ? latestValue - firstValue
     : null
 
+  // Рядки таблиці: від найновіших до найстаріших (bodyStats — за зростанням).
+  const tableRows = bodyStats.slice().reverse().map(item => ({
+    date: new Date(item.recorded_at).toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    values: item,
+  }))
+
   if (loading) {
     return (
       <div className="screen">
@@ -347,142 +368,161 @@ export default function Progress() {
             borderColor: '#ec489935',
           }}
         >
-          <div className="card-row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
-            <div>
-              <div className="h-3">Заміри тіла</div>
-              <div className="meta" style={{ marginTop: 8 }}>6 місяців</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="num" style={{ fontSize: 22, fontWeight: 700 }}>
-                {latestValue ?? '—'}
-                <span style={{ fontSize: 14, color: 'var(--text-3)', marginLeft: 4 }}>{activeField.unit}</span>
-              </div>
-              {delta !== null && (
-                <div
-                  className="meta"
-                  style={{
-                    marginTop: 4,
-                    color: delta <= 0 ? 'var(--accent)' : 'var(--warning)',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {delta > 0 ? '+' : ''}{delta.toFixed(1)}{activeField.unit}
-                </div>
-              )}
-              {goalWeight != null && latestValue != null && (
-                <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(96,165,250,0.9)', fontWeight: 600 }}>
-                  {latestValue === goalWeight
-                    ? 'Ціль досягнута!'
-                    : `до цілі ${Math.abs(latestValue - goalWeight).toFixed(1)} кг`}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="pill-btn"
-              data-active={bodyMode === 'weight' ? '1' : '0'}
-              onClick={() => setBodyMode('weight')}
-            >
-              Вага
-            </button>
-            <button
-              type="button"
-              className="pill-btn"
-              data-active={bodyMode === 'other' ? '1' : '0'}
-              onClick={() => setBodyMode('other')}
-            >
-              Інше
-            </button>
-            {bodyMode === 'other' && (
-              <select
-                value={otherField}
-                onChange={event => setOtherField(event.target.value)}
-                className="select-field"
-                style={{ minHeight: 36, paddingRight: 28 }}
+          <div className="card-row" style={{ marginBottom: 16, alignItems: 'center' }}>
+            <div className="h-3">Заміри тіла</div>
+            <div className="seg-toggle">
+              <button
+                type="button"
+                className="seg-toggle-btn"
+                data-active={chartView === 'graph' ? '1' : '0'}
+                onClick={() => setChartView('graph')}
               >
-                {BODY_FIELDS.filter(field => field.key !== 'weight_kg').map(field => (
-                  <option key={field.key} value={field.key}>{field.label}</option>
-                ))}
-              </select>
-            )}
+                Графік
+              </button>
+              <button
+                type="button"
+                className="seg-toggle-btn"
+                data-active={chartView === 'table' ? '1' : '0'}
+                onClick={() => setChartView('table')}
+              >
+                Таблиця
+              </button>
+            </div>
           </div>
 
-          {points.length >= 1 ? (
+          {chartView === 'graph' ? (
             <>
-              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ height: 150 }}>
-                <defs>
-                  <linearGradient id="body-area" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="rgba(198,255,61,0.28)" />
-                    <stop offset="100%" stopColor="rgba(198,255,61,0)" />
-                  </linearGradient>
-                </defs>
+              {/* Назва показника + дельта зміни */}
+              <div style={{ marginBottom: 4 }}>
+                <div className="h-2" style={{ fontSize: 24 }}>{activeField.label}</div>
+                {delta !== null && (
+                  <div
+                    style={{
+                      marginTop: 2,
+                      color: delta <= 0 ? 'var(--accent)' : 'var(--warning)',
+                      fontSize: 15,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {delta > 0 ? '+' : '−'}{Math.abs(delta).toFixed(1)} {activeField.unit} {delta <= 0 ? '↓' : '↑'}
+                  </div>
+                )}
+              </div>
 
-                {[0.2, 0.5, 0.8].map(step => (
-                  <line
-                    key={step}
-                    x1={padX}
-                    x2={chartWidth - padX}
-                    y1={padY + (chartHeight - padY * 2) * step}
-                    y2={padY + (chartHeight - padY * 2) * step}
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeDasharray="3 5"
-                  />
-                ))}
+              {points.length >= 1 ? (
+                <>
+                  <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ height: 180, marginTop: 8 }}>
+                    <defs>
+                      <linearGradient id="body-area" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="rgba(198,255,61,0.28)" />
+                        <stop offset="100%" stopColor="rgba(198,255,61,0)" />
+                      </linearGradient>
+                    </defs>
 
-                {goalY != null && (
-                  <>
-                    <line
-                      x1={padX}
-                      x2={chartWidth - padX}
-                      y1={goalY}
-                      y2={goalY}
-                      stroke="rgba(96,165,250,0.7)"
-                      strokeWidth="1.5"
-                      strokeDasharray="5 4"
-                    />
-                    <text
-                      x={chartWidth - padX - 2}
-                      y={goalY - 4}
-                      textAnchor="end"
-                      fill="rgba(96,165,250,0.9)"
-                      fontSize="10"
-                      fontWeight="600"
+                    {[0.2, 0.5, 0.8].map(step => (
+                      <line
+                        key={step}
+                        x1={padX}
+                        x2={chartWidth - padX}
+                        y1={padY + (chartHeight - padY * 2) * step}
+                        y2={padY + (chartHeight - padY * 2) * step}
+                        stroke="rgba(255,255,255,0.06)"
+                        strokeDasharray="3 5"
+                      />
+                    ))}
+
+                    {goalY != null && (
+                      <>
+                        <line
+                          x1={padX}
+                          x2={chartWidth - padX}
+                          y1={goalY}
+                          y2={goalY}
+                          stroke="rgba(96,165,250,0.7)"
+                          strokeWidth="1.5"
+                          strokeDasharray="5 4"
+                        />
+                        <text
+                          x={chartWidth - padX - 2}
+                          y={goalY - 4}
+                          textAnchor="end"
+                          fill="rgba(96,165,250,0.9)"
+                          fontSize="10"
+                          fontWeight="600"
+                        >
+                          {goalWeight} кг
+                        </text>
+                      </>
+                    )}
+
+                    {points.length > 1 && <path d={areaD} fill="url(#body-area)" />}
+                    {points.length > 1 && (
+                      <path
+                        d={pathD}
+                        fill="none"
+                        stroke="var(--accent)"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                    {/* Підписані значення над кожною точкою */}
+                    {points.map((point, index) => (
+                      <text
+                        key={`v-${index}`}
+                        x={point.x}
+                        y={point.y - 8}
+                        textAnchor="middle"
+                        fill="var(--text-2)"
+                        fontSize="9"
+                        fontWeight="600"
+                      >
+                        {point.value}
+                      </text>
+                    ))}
+                    {points.map((point, index) => (
+                      <circle key={index} cx={point.x} cy={point.y} r={index === points.length - 1 ? '4.5' : '3'} fill={index === points.length - 1 ? 'var(--accent)' : '#b7b8bf'} />
+                    ))}
+                  </svg>
+
+                  <div className="card-row" style={{ marginTop: 8, alignItems: 'center', gap: 8 }}>
+                    {points.map(point => (
+                      <span key={point.date} className="meta" style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>
+                        {point.date}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="meta" style={{ padding: '32px 0', textAlign: 'center' }}>
+                  Недостатньо замірів для побудови графіка.
+                </div>
+              )}
+
+              {/* Пілси-іконки для вибору показника */}
+              <div className="measure-pills">
+                {CHART_FIELDS.map(field => {
+                  const PillIcon = BODY_ICONS[field.icon]
+                  const active = activeFieldKey === field.key
+                  return (
+                    <button
+                      key={field.key}
+                      type="button"
+                      className="measure-pill"
+                      data-active={active ? '1' : '0'}
+                      onClick={() => setActiveFieldKey(field.key)}
                     >
-                      {goalWeight} кг
-                    </text>
-                  </>
-                )}
-
-                {points.length > 1 && <path d={areaD} fill="url(#body-area)" />}
-                {points.length > 1 && (
-                  <path
-                    d={pathD}
-                    fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-                {points.map((point, index) => (
-                  <circle key={index} cx={point.x} cy={point.y} r={index === points.length - 1 ? '4.5' : '3'} fill={index === points.length - 1 ? 'var(--accent)' : '#b7b8bf'} />
-                ))}
-              </svg>
-
-              <div className="card-row" style={{ marginTop: 8, alignItems: 'center', gap: 8 }}>
-                {points.map(point => (
-                  <span key={point.date} className="meta" style={{ flex: 1, textAlign: 'center', fontSize: 11 }}>
-                    {point.date}
-                  </span>
-                ))}
+                      <span className="measure-pill-dot">
+                        {PillIcon ? <PillIcon size={22} /> : null}
+                      </span>
+                      <span className="measure-pill-label">{field.label}</span>
+                    </button>
+                  )
+                })}
               </div>
             </>
           ) : (
-            <div className="meta">Недостатньо замірів для побудови графіка.</div>
+            <MeasureTable rows={tableRows} columns={CHART_FIELDS} />
           )}
         </section>
 
@@ -624,6 +664,51 @@ export default function Progress() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Таблиця замірів: дата × показники. Колонка «Дата» липка зліва,
+// решта показників горизонтально скролиться (як ексель).
+function MeasureTable({ rows, columns }) {
+  const fieldByKey = Object.fromEntries(BODY_FIELDS.map(f => [f.key, f]))
+
+  if (rows.length === 0) {
+    return (
+      <div className="meta" style={{ padding: '32px 0', textAlign: 'center' }}>
+        Ще немає збережених замірів.
+      </div>
+    )
+  }
+
+  return (
+    <div className="measure-table-wrap">
+      <table className="measure-table">
+        <thead>
+          <tr>
+            <th className="measure-table-date">Дата</th>
+            {columns.map(col => (
+              <th key={col.key}>{col.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri}>
+              <td className="measure-table-date">{row.date}</td>
+              {columns.map(col => {
+                const value = row.values[col.key]
+                const unit = fieldByKey[col.key]?.unit ?? ''
+                return (
+                  <td key={col.key}>
+                    {value != null ? `${value} ${unit}` : '—'}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

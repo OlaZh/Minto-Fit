@@ -22,15 +22,16 @@ export const BODY_FIELDS = [
 
 // Поля для графіків/пілсів: вага + по одному репрезентативному обхвату на зону
 // (щоб не дублювати ліво/право в перемикачі). Ліву сторону беремо як основну.
+// icon — ключ іконки частини тіла (мапінг ключ→компонент у Progress.jsx).
 export const CHART_FIELDS = [
-  { key: 'weight_kg',  label: 'Вага' },
-  { key: 'neck',       label: 'Шия' },
-  { key: 'chest',      label: 'Груди' },
-  { key: 'waist',      label: 'Талія' },
-  { key: 'hips',       label: 'Стегна' },
-  { key: 'left_arm',   label: 'Рука' },
-  { key: 'left_thigh', label: 'Стегно' },
-  { key: 'left_calf',  label: 'Литка' },
+  { key: 'weight_kg',  label: 'Вага',   icon: 'weight' },
+  { key: 'chest',      label: 'Груди',  icon: 'chest' },
+  { key: 'waist',      label: 'Талія',  icon: 'waist' },
+  { key: 'hips',       label: 'Стегна', icon: 'glutes' },
+  { key: 'left_thigh', label: 'Стегно', icon: 'thigh' },
+  { key: 'neck',       label: 'Шия',    icon: 'neck' },
+  { key: 'left_arm',   label: 'Біцепс', icon: 'biceps' },
+  { key: 'left_calf',  label: 'Литка',  icon: 'calf' },
 ]
 
 export const bodyFieldByKey = Object.fromEntries(BODY_FIELDS.map(f => [f.key, f]))
