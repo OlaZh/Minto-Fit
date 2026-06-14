@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadErrorState from '../components/LoadErrorState'
 import { IconArrowLeft, IconPlus, IconX, IconCheck } from '../components/Icons'
 import ProgramGlyph from '../components/ProgramGlyph'
 
@@ -55,6 +56,7 @@ export default function ProgramEdit() {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(!isNew)
   const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [actionError, setActionError] = useState(null)
@@ -81,7 +83,7 @@ export default function ProgramEdit() {
     }
 
     void loadGroups()
-  }, [id])
+  }, [id, reloadKey])
 
   useEffect(() => {
     if (!isNew) {
@@ -130,7 +132,7 @@ export default function ProgramEdit() {
 
       void loadProgram()
     }
-  }, [id, isNew])
+  }, [id, isNew, reloadKey])
 
   async function openPicker() {
     if (allExercises.length === 0) {
@@ -302,19 +304,7 @@ export default function ProgramEdit() {
   if (loadError) {
     return (
       <div className="screen screen--no-nav">
-        <div className="page page-top stack">
-          <div style={{
-            background: 'rgba(255,90,95,0.1)',
-            border: '1px solid rgba(255,90,95,0.25)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            color: 'var(--danger)',
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}>
-            {loadError}
-          </div>
-        </div>
+        <LoadErrorState message={loadError} onRetry={() => setReloadKey(value => value + 1)} />
       </div>
     )
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadErrorState from '../components/LoadErrorState'
 import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconChevronRight, IconPlus } from '../components/Icons'
 import ProgramGlyph from '../components/ProgramGlyph'
@@ -47,6 +48,7 @@ export default function Programs() {
   const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [profileOpen, setProfileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(new Set())
   const navigate = useNavigate()
@@ -74,7 +76,7 @@ export default function Programs() {
     }
 
     void loadPrograms()
-  }, [])
+  }, [reloadKey])
 
   function toggleGroup(key) {
     setCollapsed(prev => {
@@ -95,19 +97,7 @@ export default function Programs() {
   if (loadError) {
     return (
       <div className="screen">
-        <div className="page page-top stack">
-          <div style={{
-            background: 'rgba(255,90,95,0.1)',
-            border: '1px solid rgba(255,90,95,0.25)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            color: 'var(--danger)',
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}>
-            {loadError}
-          </div>
-        </div>
+        <LoadErrorState message={loadError} onRetry={() => setReloadKey(value => value + 1)} />
       </div>
     )
   }

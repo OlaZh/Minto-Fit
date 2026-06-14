@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadErrorState from '../components/LoadErrorState'
 import {
   appendPendingSet,
   clearCurrentWorkout,
@@ -53,6 +54,7 @@ export default function ActiveWorkout() {
 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [program, setProgram] = useState(null)
   const [exercises, setExercises] = useState([])
   const [prevSets, setPrevSets] = useState({})
@@ -286,7 +288,7 @@ export default function ActiveWorkout() {
     }
 
     void load()
-  }, [isPreview, navigate, programId])
+  }, [isPreview, navigate, programId, reloadKey])
 
   useEffect(() => {
     if (!getLS('mf_wake_lock_enabled', true)) return
@@ -652,19 +654,7 @@ export default function ActiveWorkout() {
   if (loadError) {
     return (
       <div className="screen screen--no-nav">
-        <div className="page page-top stack">
-          <div style={{
-            background: 'rgba(255,90,95,0.1)',
-            border: '1px solid rgba(255,90,95,0.25)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            color: 'var(--danger)',
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}>
-            {loadError}
-          </div>
-        </div>
+        <LoadErrorState message={loadError} onRetry={() => setReloadKey(value => value + 1)} />
       </div>
     )
   }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import LoadErrorState from './LoadErrorState'
 import { IconX, IconBell, IconVibration, IconBrightness, IconStopwatch } from './Icons'
 import { BODY_FIELDS } from '../lib/bodyFields'
 import BodyFigure from './BodyFigure'
@@ -33,6 +34,7 @@ export default function ProfileSheet({ onClose }) {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [bodyLoadError, setBodyLoadError] = useState(null)
+  const [bodyReloadKey, setBodyReloadKey] = useState(0)
 
   useEffect(() => {
     async function loadBodyStats() {
@@ -56,7 +58,7 @@ export default function ProfileSheet({ onClose }) {
     }
 
     void loadBodyStats()
-  }, [])
+  }, [bodyReloadKey])
 
   function toggle(key, value, setter) {
     setter(value)
@@ -192,16 +194,13 @@ export default function ProfileSheet({ onClose }) {
             {bodyOpen && (
               <div className="stack" style={{ gap: 8 }}>
                 {bodyLoadError && (
-                  <div style={{
-                    background: 'rgba(255,181,71,0.08)',
-                    border: '1px solid rgba(255,181,71,0.22)',
-                    borderRadius: 12,
-                    padding: '10px 14px',
-                    fontSize: 12,
-                    color: 'var(--warning)',
-                  }}>
-                    {bodyLoadError}
-                  </div>
+                  <LoadErrorState
+                    message={bodyLoadError}
+                    onRetry={() => setBodyReloadKey(value => value + 1)}
+                    fullScreen={false}
+                    retryLabel="Повторити"
+                    tone="warning"
+                  />
                 )}
                 {saveError && (
                   <div style={{

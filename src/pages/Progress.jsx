@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
+import LoadErrorState from '../components/LoadErrorState'
 import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconTrophy, IconX } from '../components/Icons'
 import { BODY_FIELDS } from '../lib/bodyFields'
@@ -23,6 +24,7 @@ export default function Progress() {
   const [bodyStats, setBodyStats] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [bodyMode, setBodyMode] = useState('weight')
   const [otherField, setOtherField] = useState('waist')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -83,7 +85,7 @@ export default function Progress() {
     }
 
     void load()
-  }, [])
+  }, [reloadKey])
 
   const activeFieldKey = bodyMode === 'weight' ? 'weight_kg' : otherField
   const activeField = BODY_FIELDS.find(field => field.key === activeFieldKey) ?? BODY_FIELDS[0]
@@ -235,19 +237,7 @@ export default function Progress() {
   if (loadError) {
     return (
       <div className="screen">
-        <div className="page page-top stack">
-          <div style={{
-            background: 'rgba(255,90,95,0.1)',
-            border: '1px solid rgba(255,90,95,0.25)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            color: 'var(--danger)',
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}>
-            {loadError}
-          </div>
-        </div>
+        <LoadErrorState message={loadError} onRetry={() => setReloadKey(value => value + 1)} />
       </div>
     )
   }

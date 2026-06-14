@@ -8,6 +8,7 @@ import {
   getPendingFinish,
   syncPendingSetsForWorkout,
 } from '../lib/workoutStorage'
+import LoadErrorState from '../components/LoadErrorState'
 import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconPlay } from '../components/Icons'
 import ProgramGlyph from '../components/ProgramGlyph'
@@ -67,6 +68,7 @@ export default function Workout() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [profileOpen, setProfileOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const touchStartX = useRef(null)
@@ -215,7 +217,7 @@ export default function Workout() {
     }
 
     void loadAll()
-  }, [])
+  }, [reloadKey])
 
   if (loading) {
     return (
@@ -228,19 +230,7 @@ export default function Workout() {
   if (loadError) {
     return (
       <div className="screen">
-        <div className="page page-top stack">
-          <div style={{
-            background: 'rgba(255,90,95,0.1)',
-            border: '1px solid rgba(255,90,95,0.25)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            color: 'var(--danger)',
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}>
-            {loadError}
-          </div>
-        </div>
+        <LoadErrorState message={loadError} onRetry={() => setReloadKey(value => value + 1)} />
       </div>
     )
   }

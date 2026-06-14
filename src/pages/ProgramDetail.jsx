@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoadErrorState from '../components/LoadErrorState'
 import { IconArrowLeft, IconPlay, IconNote, IconPlus, IconX } from '../components/Icons'
 import ProgramGlyph from '../components/ProgramGlyph'
 
@@ -33,6 +34,7 @@ export default function ProgramDetail() {
   const [exercises, setExercises] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [noteOpen, setNoteOpen] = useState(null)
   const [noteText, setNoteText] = useState('')
   const [editingCell, setEditingCell] = useState(null)
@@ -69,7 +71,7 @@ export default function ProgramDetail() {
       }
     }
     void load()
-  }, [id])
+  }, [id, reloadKey])
 
   function commitField(peId, field, raw) {
     const trimmed = String(raw).trim()
@@ -230,19 +232,7 @@ export default function ProgramDetail() {
   if (loadError) {
     return (
       <div className="screen screen--no-nav">
-        <div className="page page-top stack">
-          <div style={{
-            background: 'rgba(255,90,95,0.1)',
-            border: '1px solid rgba(255,90,95,0.25)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            color: 'var(--danger)',
-            fontSize: 14,
-            lineHeight: 1.5,
-          }}>
-            {loadError}
-          </div>
-        </div>
+        <LoadErrorState message={loadError} onRetry={() => setReloadKey(value => value + 1)} />
       </div>
     )
   }
