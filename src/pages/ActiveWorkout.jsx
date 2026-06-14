@@ -953,7 +953,8 @@ export default function ActiveWorkout() {
             setState={setCardio}
             liveSec={cardioLiveSec(cardio)}
             onToggle={() => toggleCardioTimer(setCardio)}
-            disabled={interactionLocked}
+            selectDisabled={isPreview}
+            actionDisabled={interactionLocked}
           />
         )}
 
@@ -1266,7 +1267,8 @@ export default function ActiveWorkout() {
             setState={setCardioFinish}
             liveSec={cardioLiveSec(cardioFinish)}
             onToggle={() => toggleCardioTimer(setCardioFinish)}
-            disabled={interactionLocked}
+            selectDisabled={isPreview}
+            actionDisabled={interactionLocked}
           />
         )}
       </div>
@@ -1511,7 +1513,7 @@ export default function ActiveWorkout() {
 
 const CARDIO_TYPES = ['Сходи', 'Еліпс', 'Бігова доріжка', 'Велотренажер']
 
-function CardioBlock({ title, state, setState, liveSec, onToggle, disabled = false }) {
+function CardioBlock({ title, state, setState, liveSec, onToggle, selectDisabled = false, actionDisabled = false }) {
   const running = !!state.startedAt
   const done = state.done && !running
 
@@ -1533,7 +1535,7 @@ function CardioBlock({ title, state, setState, liveSec, onToggle, disabled = fal
             value={state.type}
             onChange={event => setState(value => ({ ...value, type: event.target.value }))}
             className="select-field"
-            disabled={running || disabled}
+            disabled={running || selectDisabled}
             style={{ marginTop: 6 }}
           >
             {CARDIO_TYPES.map(option => (
@@ -1565,7 +1567,7 @@ function CardioBlock({ title, state, setState, liveSec, onToggle, disabled = fal
           type="button"
           onClick={onToggle}
           className="btn btn-sm"
-          disabled={disabled}
+          disabled={actionDisabled}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             minWidth: 96, justifyContent: 'center',
