@@ -1159,6 +1159,115 @@
   display: block;
 }
 
+/* Б2 — фігура тіла з виносками (екран вводу замірів) */
+.body-callout {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1024 / 1536;
+  margin: 4px auto 8px;
+}
+
+.body-callout-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.body-callout-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.body-callout-lines line {
+  transition: stroke 0.18s ease, stroke-width 0.18s ease;
+}
+
+.body-callout-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  padding: 0;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--text-2);
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+}
+
+.body-callout-dot:hover { transform: scale(1.15); }
+
+.body-callout-dot[data-active='1'] {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(77, 207, 160, 0.7);
+}
+
+.body-callout-card {
+  position: absolute;
+  width: 38%;
+  max-width: 150px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.body-callout-card[data-side='left']   { left: 0; }
+.body-callout-card[data-side='right']  { right: 0; }
+.body-callout-card[data-side='bottom'] { left: 50%; transform: translateX(-50%); width: 46%; }
+
+.body-callout-card[data-active='1'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.body-callout-label {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+
+.body-callout-input {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.body-callout-input input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+
+.body-callout-input input::-webkit-outer-spin-button,
+.body-callout-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.body-callout-input span {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
 .auth-shell {
   min-height: 100dvh;
   display: flex;

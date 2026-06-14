@@ -3,14 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { IconArrowLeft } from '../components/Icons'
 import { BODY_FIELDS as FIELDS, CHART_FIELDS } from '../lib/bodyFields'
+import BodyFigure from '../components/BodyFigure'
 
 export default function BodyStats() {
   const navigate = useNavigate()
   const [history, setHistory] = useState([])
   const [form, setForm] = useState({})
   const [activeChart, setActiveChart] = useState('weight_kg')
+  const [activeKey, setActiveKey] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  function handleField(key, value) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
 
   useEffect(() => {
     supabase
@@ -126,34 +132,14 @@ export default function BodyStats() {
 
         <section className="card">
           <div className="h-3" style={{ marginBottom: 12 }}>Нова сесія</div>
-          <div className="stack" style={{ gap: 10 }}>
-            {FIELDS.map(field => (
-              <div
-                key={field.key}
-                className="card-row"
-                style={{
-                  padding: '14px 16px',
-                  borderRadius: 16,
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                <label style={{ color: 'var(--text)' }}>{field.label}</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="number"
-                    step={field.step}
-                    value={form[field.key] ?? ''}
-                    onChange={event => setForm(prev => ({ ...prev, [field.key]: event.target.value }))}
-                    placeholder="—"
-                    className="field"
-                    style={{ width: 86, textAlign: 'right', background: 'transparent', border: 0, paddingRight: 0 }}
-                  />
-                  <span className="meta" style={{ width: 22 }}>{field.unit}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+
+          <BodyFigure
+            form={form}
+            fields={FIELDS}
+            activeKey={activeKey}
+            onChange={handleField}
+            onFocusField={setActiveKey}
+          />
 
           <button
             type="button"
