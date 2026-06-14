@@ -135,7 +135,6 @@ export default function BodyStats() {
 
           <BodyFigure
             form={form}
-            fields={FIELDS}
             activeKey={activeKey}
             onChange={handleField}
             onFocusField={setActiveKey}

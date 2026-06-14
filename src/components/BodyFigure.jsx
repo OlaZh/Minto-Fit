@@ -1,98 +1,107 @@
-// Б2 — фігура тіла з виносками (основний UI вводу замірів).
-// Фігура по центру; навколо — картки полів, від кожної тонка лінія-виноска
-// до точки (anchor) на тілі. Розкладка — у відсотках контейнера, щоб лягала
-// на фонову картинку незалежно від її розміру.
+// Б2 — фігура тіла з виносками (UI вводу замірів).
+// Фігура по центру; навколо — картки ЗОН, від кожної тонка лінія-виноска до
+// точки (anchor) на тілі. Парні зони (рука/стегно/литка) — одна точка, але
+// в картці два поля: Л / П. Розкладка у % контейнера, щоб лягала на картинку.
 //
-// Картинку клади у public/body-figure.png (front view). Поки файлу немає —
-// показуємо градієнтний placeholder, розкладка від цього не залежить.
+// Картинка: src/assets/body-figure.png (front view). Координати точок —
+// ZONES[*].anchor; правити там, якщо точка зʼїхала.
 
 import bodyImg from '../assets/body-figure.png'
+import { BODY_FIELDS } from '../lib/bodyFields'
 
-// Кожне поле: де його anchor-точка на тілі (% від ширини/висоти контейнера),
-// з якого боку картка (left/right/bottom) і вертикальна позиція картки.
-// side впливає на те, з якого краю картки виходить виноска.
-const FIELD_LAYOUT = {
-  chest:      { anchor: [50, 27], card: { side: 'left',   top: '8%'  } },
-  neck:       { anchor: [52, 16], card: { side: 'right',  top: '8%'  } },
-  left_arm:   { anchor: [35, 32], card: { side: 'left',   top: '27%' } },
-  waist:      { anchor: [50, 40], card: { side: 'right',  top: '27%' } },
-  hips:       { anchor: [39, 47], card: { side: 'left',   top: '46%' } },
-  right_thigh:{ anchor: [60, 55], card: { side: 'right',  top: '46%' } },
-  left_calf:  { anchor: [41, 77], card: { side: 'left',   top: '66%' } },
-  weight_kg:  { anchor: [50, 95], card: { side: 'bottom', top: '86%' } },
-}
+// Зони у порядку зверху вниз. keys — поля з bodyFields для цієї зони
+// (одне для одиночних, [ліве, праве] для парних). anchor — точка на тілі (%),
+// card.side — з якого боку картка, card.top — її вертикальна позиція.
+const ZONES = [
+  { id: 'neck',   label: 'Шия',    keys: ['neck'],                  anchor: [52, 16], card: { side: 'right',  top: '7%'  } },
+  { id: 'chest',  label: 'Груди',  keys: ['chest'],                 anchor: [50, 27], card: { side: 'left',   top: '7%'  } },
+  { id: 'arm',    label: 'Руки',   keys: ['left_arm', 'right_arm'], anchor: [35, 32], card: { side: 'left',   top: '25%' } },
+  { id: 'waist',  label: 'Талія',  keys: ['waist'],                 anchor: [50, 40], card: { side: 'right',  top: '25%' } },
+  { id: 'hips',   label: 'Стегна', keys: ['hips'],                  anchor: [39, 47], card: { side: 'left',   top: '43%' } },
+  { id: 'thigh',  label: 'Стегно', keys: ['left_thigh', 'right_thigh'], anchor: [60, 55], card: { side: 'right', top: '43%' } },
+  { id: 'calf',   label: 'Литка',  keys: ['left_calf', 'right_calf'],   anchor: [41, 77], card: { side: 'left',  top: '64%' } },
+  { id: 'wrist',  label: "Зап'ясток", keys: ['wrist'],              anchor: [30, 50], card: { side: 'right',  top: '64%' } },
+  { id: 'weight', label: 'Вага',   keys: ['weight_kg'],             anchor: [50, 95], card: { side: 'bottom', top: '85%' } },
+]
 
-export default function BodyFigure({ form, onChange, fields, activeKey, onFocusField }) {
-  // Лишаємо тільки поля, для яких є позиція в розкладці (по одному на зону).
-  const placed = fields.filter(field => FIELD_LAYOUT[field.key])
+const fieldByKey = Object.fromEntries(BODY_FIELDS.map(f => [f.key, f]))
+
+export default function BodyFigure({ form, onChange, activeKey, onFocusField }) {
+  // Чи активна зона (підсвічуємо точку/виноску, якщо фокус на будь-якому її полі).
+  const isZoneActive = zone => zone.keys.includes(activeKey)
 
   return (
     <div className="body-callout">
       <img src={bodyImg} alt="Фігура тіла" className="body-callout-img" draggable={false} />
 
-      {/* Виноски (SVG поверх усього контейнера, у % координатах) */}
+      {/* Виноски */}
       <svg className="body-callout-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {placed.map(field => {
-          const { anchor, card } = FIELD_LAYOUT[field.key]
-          const [ax, ay] = anchor
-          // Точка приєднання виноски — внутрішній край картки.
-          // Картки 38% завширшки притиснуті до краю; +2% на середину рядка.
-          const cardX = card.side === 'left' ? 38 : card.side === 'right' ? 62 : 50
-          const cardY = parseFloat(card.top) + 6 // приблизно центр картки по висоті
-          const isActive = activeKey === field.key
+        {ZONES.map(zone => {
+          const [ax, ay] = zone.anchor
+          const cardX = zone.card.side === 'left' ? 40 : zone.card.side === 'right' ? 60 : 50
+          const cardY = parseFloat(zone.card.top) + 5
+          const active = isZoneActive(zone)
           return (
             <line
-              key={field.key}
+              key={zone.id}
               x1={cardX} y1={cardY} x2={ax} y2={ay}
-              stroke={isActive ? 'var(--accent)' : 'var(--border-bright)'}
-              strokeWidth={isActive ? 0.5 : 0.3}
+              stroke={active ? 'var(--accent)' : 'var(--border-bright)'}
+              strokeWidth={active ? 0.5 : 0.3}
               vectorEffect="non-scaling-stroke"
             />
           )
         })}
       </svg>
 
-      {/* Anchor-точки на тілі */}
-      {placed.map(field => {
-        const [ax, ay] = FIELD_LAYOUT[field.key].anchor
-        const isActive = activeKey === field.key
+      {/* Точки на тілі */}
+      {ZONES.map(zone => {
+        const [ax, ay] = zone.anchor
         return (
           <button
-            key={`dot-${field.key}`}
+            key={`dot-${zone.id}`}
             type="button"
             className="body-callout-dot"
-            data-active={isActive ? '1' : '0'}
+            data-active={isZoneActive(zone) ? '1' : '0'}
             style={{ left: `${ax}%`, top: `${ay}%` }}
-            onClick={() => onFocusField?.(field.key)}
-            aria-label={field.label}
+            onClick={() => onFocusField?.(zone.keys[0])}
+            aria-label={zone.label}
           />
         )
       })}
 
-      {/* Картки полів */}
-      {placed.map(field => {
-        const { card } = FIELD_LAYOUT[field.key]
-        const isActive = activeKey === field.key
+      {/* Картки зон */}
+      {ZONES.map(zone => {
+        const paired = zone.keys.length > 1
+        const unit = fieldByKey[zone.keys[0]]?.unit ?? ''
         return (
           <div
-            key={`card-${field.key}`}
+            key={`card-${zone.id}`}
             className="body-callout-card"
-            data-side={card.side}
-            data-active={isActive ? '1' : '0'}
-            style={{ top: card.top }}
+            data-side={zone.card.side}
+            data-active={isZoneActive(zone) ? '1' : '0'}
+            style={{ top: zone.card.top }}
           >
-            <div className="body-callout-label">{field.label}</div>
-            <div className="body-callout-input">
-              <input
-                type="number"
-                step={field.step}
-                value={form[field.key] ?? ''}
-                onChange={event => onChange(field.key, event.target.value)}
-                onFocus={() => onFocusField?.(field.key)}
-                placeholder="0.0"
-                inputMode="decimal"
-              />
-              <span>{field.unit}</span>
+            <div className="body-callout-label">
+              {zone.label}<span className="body-callout-unit">{unit}</span>
+            </div>
+            <div className="body-callout-inputs" data-paired={paired ? '1' : '0'}>
+              {zone.keys.map(key => {
+                const field = fieldByKey[key]
+                return (
+                  <label key={key} className="body-callout-input">
+                    {paired && <span className="body-callout-side">{field.side === 'left' ? 'Л' : 'П'}</span>}
+                    <input
+                      type="number"
+                      step={field.step}
+                      value={form[key] ?? ''}
+                      onChange={event => onChange(key, event.target.value)}
+                      onFocus={() => onFocusField?.(key)}
+                      placeholder="0"
+                      inputMode="decimal"
+                    />
+                  </label>
+                )
+              })}
             </div>
           </div>
         )

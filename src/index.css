@@ -1192,9 +1192,9 @@
 
 .body-callout-dot {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  margin: -6px 0 0 -6px;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
   padding: 0;
   border: 2px solid var(--bg);
   border-radius: 50%;
@@ -1203,44 +1203,70 @@
   transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 
-.body-callout-dot:hover { transform: scale(1.15); }
+.body-callout-dot:hover { transform: scale(1.2); }
 
 .body-callout-dot[data-active='1'] {
   background: var(--accent);
-  box-shadow: 0 0 10px rgba(77, 207, 160, 0.7);
+  box-shadow: 0 0 8px rgba(77, 207, 160, 0.7);
 }
 
 .body-callout-card {
   position: absolute;
-  width: 38%;
-  max-width: 150px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  width: 35%;
+  max-width: 140px;
+  padding: 6px 9px;
+  border-radius: 9px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .body-callout-card[data-side='left']   { left: 0; }
 .body-callout-card[data-side='right']  { right: 0; }
-.body-callout-card[data-side='bottom'] { left: 50%; transform: translateX(-50%); width: 46%; }
+.body-callout-card[data-side='bottom'] { left: 50%; transform: translateX(-50%); width: 42%; }
 
 .body-callout-card[data-active='1'] {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset, 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 
 .body-callout-label {
-  font-size: 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
   color: var(--text-2);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.body-callout-unit {
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.body-callout-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.body-callout-inputs[data-paired='1'] .body-callout-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .body-callout-input {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 4px;
+  cursor: text;
+}
+
+.body-callout-side {
+  font-size: 10px;
+  color: var(--text-3);
+  flex-shrink: 0;
 }
 
 .body-callout-input input {
@@ -1250,7 +1276,7 @@
   border: 0;
   outline: none;
   color: var(--text);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
@@ -1260,12 +1286,6 @@
 .body-callout-input input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-
-.body-callout-input span {
-  font-size: 12px;
-  color: var(--text-3);
-  white-space: nowrap;
 }
 
 .auth-shell {

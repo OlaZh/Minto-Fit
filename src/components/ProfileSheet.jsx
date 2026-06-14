@@ -169,7 +169,6 @@ export default function ProfileSheet({ onClose }) {
               <div className="stack" style={{ gap: 8 }}>
                 <BodyFigure
                   form={bodyForm}
-                  fields={BODY_FIELDS}
                   activeKey={bodyActiveKey}
                   onChange={(key, value) => setBodyForm(prev => ({ ...prev, [key]: value }))}
                   onFocusField={setBodyActiveKey}
