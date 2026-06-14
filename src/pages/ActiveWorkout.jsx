@@ -1274,9 +1274,19 @@ export default function ActiveWorkout() {
 
       <div className="finish-bar">
         {isPreview ? (
-          <button type="button" className="btn btn-ghost btn-block" onClick={() => navigate(-1)}>
-            Закрити перегляд
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)} style={{ flex: 1 }}>
+              Закрити перегляд
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate(`/workout/${programId}`, { state: { fromApp: true }, replace: true })}
+              style={{ flex: 1 }}
+            >
+              До старту
+            </button>
+          </div>
         ) : !hasStarted ? (
           <button
             type="button"

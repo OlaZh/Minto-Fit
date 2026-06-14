@@ -282,7 +282,7 @@ export default function Workout() {
 
               <button
                 type="button"
-                onClick={() => setPickerOpen(true)}
+                onClick={() => navigate(`/workout/${nextProgram.id}`, { state: { fromApp: true, preview: true } })}
                 style={{ textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -316,14 +316,24 @@ export default function Workout() {
                 ))}
               </div>
 
-              <button
-                type="button"
-                className="btn btn-primary btn-block"
-                onClick={() => navigate(`/workout/${nextProgram.id}`, { state: { fromApp: true } })}
-                style={{ gap: 8, fontSize: 15 }}
-              >
-                <IconPlay size={15} /> Відкрити програму
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => navigate(`/workout/${nextProgram.id}`, { state: { fromApp: true, preview: true } })}
+                  style={{ flex: 1 }}
+                >
+                  Переглянути
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => navigate(`/workout/${nextProgram.id}`, { state: { fromApp: true } })}
+                  style={{ flex: 1, gap: 8, fontSize: 15 }}
+                >
+                  <IconPlay size={15} /> До старту
+                </button>
+              </div>
             </div>
           </div>
         ) : (
