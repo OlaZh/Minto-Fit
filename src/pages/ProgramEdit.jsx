@@ -56,6 +56,7 @@ export default function ProgramEdit() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [removedExerciseRowIds, setRemovedExerciseRowIds] = useState([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [allExercises, setAllExercises] = useState([])
   const [search, setSearch] = useState('')
@@ -90,6 +91,7 @@ export default function ProgramEdit() {
           setActivityType(prog.activity_type ?? 'силове')
         }
         setExercises((exs ?? []).map(e => ({
+          row_id: e.id,
           exercise_id: e.exercise.id,
           name: e.exercise.name,
           sets:     e.default_sets   != null ? String(e.default_sets)   : '',
@@ -102,6 +104,7 @@ export default function ProgramEdit() {
           about: e.exercise.about ?? '',
           photo_url: e.exercise.machine_photo_url ?? '',
         })))
+        setRemovedExerciseRowIds([])
         setLoading(false)
       })
     }
@@ -119,6 +122,7 @@ export default function ProgramEdit() {
   function addExercise(ex) {
     if (!exercises.find(e => e.exercise_id === ex.id)) {
       setExercises(prev => [...prev, {
+        row_id: null,
         exercise_id: ex.id,
         name: ex.name,
         sets: '', reps: '', weight: '', duration: '',
@@ -149,7 +153,13 @@ export default function ProgramEdit() {
   }
 
   function removeExercise(idx) {
-    setExercises(prev => prev.filter((_, i) => i !== idx))
+    setExercises(prev => {
+      const target = prev[idx]
+      if (target?.row_id) {
+        setRemovedExerciseRowIds(ids => ids.includes(target.row_id) ? ids : [...ids, target.row_id])
+      }
+      return prev.filter((_, i) => i !== idx)
+    })
   }
 
   function updateField(idx, field, value) {
@@ -182,11 +192,11 @@ export default function ProgramEdit() {
     }
 
     const saveExerciseMeta = async (e) => {
-      const patch = {}
-      if (e.description.trim()) patch.description = e.description.trim()
-      if (e.about.trim()) patch.about = e.about.trim()
-      if (e.photo_url.trim()) patch.machine_photo_url = e.photo_url.trim()
-      if (!Object.keys(patch).length) return null
+      const patch = {
+        description: e.description.trim() || null,
+        about: e.about.trim() || null,
+        machine_photo_url: e.photo_url.trim() || null,
+      }
       const { error } = await supabase.from('mf_exercises').update(patch).eq('id', e.exercise_id)
       if (error) console.warn('exercise meta update failed:', error.message)
       return error
@@ -214,12 +224,32 @@ export default function ProgramEdit() {
         const { error: updErr } = await supabase.from('mf_programs').update({ name: name.trim(), type, color, has_cardio: hasCardio, has_cardio_finish: hasCardioFinish, activity_type: activityType }).eq('id', id)
         if (updErr) throw new Error(updErr.message)
 
-        await supabase.from('mf_program_exercises').delete().eq('program_id', id)
-        const rows = exercises.map((e, i) => buildRow(e, i, id))
-        const { error: exErr } = rows.length
-          ? await supabase.from('mf_program_exercises').insert(rows)
-          : { error: null }
-        if (exErr) throw new Error(exErr.message)
+        const indexedExercises = exercises.map((exercise, index) => ({ exercise, index }))
+        const existingRows = indexedExercises.filter(({ exercise }) => exercise.row_id)
+        const newRows = indexedExercises
+          .filter(({ exercise }) => !exercise.row_id)
+          .map(({ exercise, index }) => buildRow(exercise, index, id))
+
+        const updateResults = await Promise.all(
+          existingRows.map(({ exercise, index }) =>
+            supabase
+              .from('mf_program_exercises')
+              .update(buildRow(exercise, index, id))
+              .eq('id', exercise.row_id)
+          )
+        )
+        const updateError = updateResults.find(result => result.error)?.error
+        if (updateError) throw new Error(updateError.message)
+
+        if (newRows.length > 0) {
+          const { error: insertErr } = await supabase.from('mf_program_exercises').insert(newRows)
+          if (insertErr) throw new Error(insertErr.message)
+        }
+
+        if (removedExerciseRowIds.length > 0) {
+          const { error: deleteErr } = await supabase.from('mf_program_exercises').delete().in('id', removedExerciseRowIds)
+          if (deleteErr) throw new Error(deleteErr.message)
+        }
 
         await Promise.all(exercises.map(saveExerciseMeta))
         navigate(`/programs/${id}`)

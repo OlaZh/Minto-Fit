@@ -57,13 +57,6 @@ export const IconCheck = (p) => (
   </Icon>
 )
 
-export const IconClock = (p) => (
-  <Icon {...p}>
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7v5l3 2" />
-  </Icon>
-)
-
 export const IconFlame = (p) => (
   <Icon {...p}>
     <path d="M12 3c1.5 3 4 4.5 4 8a4 4 0 1 1-8 0c0-1.5.5-2 1.5-3C10 6.5 11 5 12 3Z" />
@@ -73,12 +66,6 @@ export const IconFlame = (p) => (
 export const IconChevronRight = (p) => (
   <Icon {...p}>
     <path d="M9 6l6 6-6 6" />
-  </Icon>
-)
-
-export const IconChevronLeft = (p) => (
-  <Icon {...p}>
-    <path d="M15 6l-6 6 6 6" />
   </Icon>
 )
 
@@ -105,13 +92,6 @@ export const IconTrophy = (p) => (
   </Icon>
 )
 
-export const IconTrend = (p) => (
-  <Icon {...p}>
-    <path d="M3 17 9 11l4 4 8-8" />
-    <path d="M14 7h7v7" />
-  </Icon>
-)
-
 export const IconArrowLeft = (p) => (
   <Icon {...p}>
     <path d="M19 12H5M11 6l-6 6 6 6" />
@@ -122,13 +102,6 @@ export const IconRotate = (p) => (
   <Icon {...p}>
     <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
     <path d="M3 3v5h5" />
-  </Icon>
-)
-
-export const IconCalendar = (p) => (
-  <Icon {...p}>
-    <rect x="3" y="5" width="18" height="16" rx="2.5" />
-    <path d="M3 10h18M8 3v4M16 3v4" />
   </Icon>
 )
 
@@ -156,13 +129,6 @@ export const IconLeaf = (p) => (
   <Icon {...p}>
     <path d="M20 4c-2.5 0-8 1-11 4S5 17 5 19c2 0 8-1 11-4s4-8.5 4-11Z" />
     <path d="M5 19l9-9" />
-  </Icon>
-)
-
-export const IconSettings = (p) => (
-  <Icon {...p}>
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
   </Icon>
 )
 

@@ -31,6 +31,7 @@ export default function ProfileSheet({ onClose }) {
   const [bodyOpen, setBodyOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState(null)
 
   useEffect(() => {
     supabase
@@ -54,16 +55,29 @@ export default function ProfileSheet({ onClose }) {
 
   async function saveBodyStats() {
     setSaving(true)
-    const { data: user } = await supabase.auth.getUser()
-    const payload = { user_id: user.user.id }
-    BODY_FIELDS.forEach(f => {
-      const v = parseFloat(bodyForm[f.key])
-      if (!isNaN(v)) payload[f.key] = v
-    })
-    await supabase.from('mf_body_stats').insert(payload)
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaveError(null)
+
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData?.user?.id) throw userError ?? new Error('No user')
+
+      const payload = { user_id: userData.user.id }
+      BODY_FIELDS.forEach(f => {
+        const v = parseFloat(bodyForm[f.key])
+        if (!isNaN(v)) payload[f.key] = v
+      })
+
+      const { error } = await supabase.from('mf_body_stats').insert(payload)
+      if (error) throw error
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error('saveBodyStats:', error)
+      setSaveError('Не вдалося зберегти заміри. Спробуй ще раз.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function logout() {
@@ -167,6 +181,18 @@ export default function ProfileSheet({ onClose }) {
 
             {bodyOpen && (
               <div className="stack" style={{ gap: 8 }}>
+                {saveError && (
+                  <div style={{
+                    background: 'rgba(255,90,95,0.1)',
+                    border: '1px solid rgba(255,90,95,0.25)',
+                    borderRadius: 12,
+                    padding: '10px 14px',
+                    fontSize: 12,
+                    color: 'var(--danger)',
+                  }}>
+                    {saveError}
+                  </div>
+                )}
                 <BodyFigure
                   form={bodyForm}
                   activeKey={bodyActiveKey}

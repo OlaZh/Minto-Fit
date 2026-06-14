@@ -9,14 +9,12 @@ import Programs from './pages/Programs'
 import ProgramDetail from './pages/ProgramDetail'
 import ProgramEdit from './pages/ProgramEdit'
 import ActiveWorkout from './pages/ActiveWorkout'
-import BodyStats from './pages/BodyStats'
 
 function AppRoutes() {
   const location = useLocation()
   const hideNav =
     location.pathname.startsWith('/workout/') ||
-    location.pathname.startsWith('/programs/') ||
-    location.pathname === '/progress/body'
+    location.pathname.startsWith('/programs/')
 
   return (
     <div className="stage">
@@ -30,7 +28,6 @@ function AppRoutes() {
             <Route path="/programs/:id" element={<ProgramDetail />} />
             <Route path="/programs/:id/edit" element={<ProgramEdit />} />
             <Route path="/workout/:programId" element={<ActiveWorkout />} />
-            <Route path="/progress/body" element={<BodyStats />} />
           </Routes>
         </div>
         {!hideNav && <BottomNav />}

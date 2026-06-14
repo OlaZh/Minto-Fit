@@ -37,6 +37,7 @@ export default function ProgramDetail() {
   const [editingCell, setEditingCell] = useState(null)
   const [pending, setPending] = useState({})
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [allExercises, setAllExercises] = useState([])
   const [search, setSearch] = useState('')
@@ -77,14 +78,33 @@ export default function ProgramDetail() {
   async function saveAllPending() {
     if (!Object.keys(pending).length) return
     setSaving(true)
-    await Promise.all(
-      Object.entries(pending).map(([peId, fields]) => {
-        if (!Object.keys(fields).length) return Promise.resolve()
-        return supabase.from('mf_program_exercises').update(fields).eq('id', peId)
-      })
-    )
-    setPending({})
-    setSaving(false)
+    setSaveError(null)
+
+    try {
+      const results = await Promise.all(
+        Object.entries(pending).map(async ([peId, fields]) => {
+          if (!Object.keys(fields).length) return { peId, ok: true }
+          const { error } = await supabase.from('mf_program_exercises').update(fields).eq('id', peId)
+          return { peId, ok: !error, error }
+        })
+      )
+
+      const failed = results.filter(result => !result.ok)
+      if (failed.length > 0) {
+        const failedIds = new Set(failed.map(result => result.peId))
+        setPending(prev => Object.fromEntries(
+          Object.entries(prev).filter(([peId]) => failedIds.has(peId))
+        ))
+        throw failed[0].error ?? new Error('Failed to save program changes')
+      }
+
+      setPending({})
+    } catch (error) {
+      console.error('saveAllPending:', error)
+      setSaveError('Не вдалося зберегти частину змін. Спробуй ще раз.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function openPicker() {
@@ -185,6 +205,19 @@ export default function ProgramDetail() {
       </div>
 
       <div className="page stack">
+        {saveError && (
+          <div style={{
+            background: 'rgba(255,90,95,0.1)',
+            border: '1px solid rgba(255,90,95,0.25)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontSize: 12,
+            color: 'var(--danger)',
+          }}>
+            {saveError}
+          </div>
+        )}
+
         <div className="card" style={{ padding: 18 }}>
           <div className="card-row" style={{ alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
