@@ -1543,8 +1543,8 @@ function CardioBlock({ title, state, setState, liveSec, onToggle, disabled = fal
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'grid', gap: 12, marginTop: 14, justifyItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}>
           {running && (
             <span style={{
               width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)',
