@@ -953,7 +953,7 @@ export default function ActiveWorkout() {
             setState={setCardio}
             liveSec={cardioLiveSec(cardio)}
             onToggle={() => toggleCardioTimer(setCardio)}
-            selectDisabled={isPreview}
+            selectDisabled={false}
             actionDisabled={interactionLocked}
           />
         )}
@@ -1267,7 +1267,7 @@ export default function ActiveWorkout() {
             setState={setCardioFinish}
             liveSec={cardioLiveSec(cardioFinish)}
             onToggle={() => toggleCardioTimer(setCardioFinish)}
-            selectDisabled={isPreview}
+            selectDisabled={false}
             actionDisabled={interactionLocked}
           />
         )}
@@ -1516,6 +1516,23 @@ const CARDIO_TYPES = ['Сходи', 'Еліпс', 'Бігова доріжка',
 function CardioBlock({ title, state, setState, liveSec, onToggle, selectDisabled = false, actionDisabled = false }) {
   const running = !!state.startedAt
   const done = state.done && !running
+  const selectLocked = running || selectDisabled
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef(null)
+  const showPicker = pickerOpen && !selectLocked
+
+  useEffect(() => {
+    if (!showPicker) return
+
+    const handlePointerDown = event => {
+      if (!pickerRef.current?.contains(event.target)) {
+        setPickerOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [showPicker])
 
   // Текст і вигляд кнопки залежно від стану: ще не почато / йде / завершено.
   let btnLabel = 'Старт'
@@ -1532,17 +1549,91 @@ function CardioBlock({ title, state, setState, liveSec, onToggle, selectDisabled
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="h-3" style={{ fontSize: 15 }}>{title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <select
-              value={state.type}
-              onChange={event => setState(value => ({ ...value, type: event.target.value }))}
-              className="select-field"
-              disabled={running || selectDisabled}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              {CARDIO_TYPES.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+            <div ref={pickerRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectLocked) return
+                  setPickerOpen(value => !value)
+                }}
+                disabled={selectLocked}
+                style={{
+                  width: '100%',
+                  minHeight: 42,
+                  padding: '0 12px',
+                  borderRadius: 12,
+                  border: `1px solid ${pickerOpen ? 'var(--border-bright)' : 'var(--border)'}`,
+                  background: 'var(--surface-2)',
+                  color: 'var(--text)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  fontSize: 15,
+                  fontWeight: 500,
+                  cursor: selectLocked ? 'default' : 'pointer',
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{state.type}</span>
+                <span style={{
+                  fontSize: 12,
+                  color: 'var(--text-3)',
+                  transform: pickerOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.18s ease',
+                  flexShrink: 0,
+                }}
+                >
+                  ˅
+                </span>
+              </button>
+
+              {showPicker && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    left: 0,
+                    right: 0,
+                    zIndex: 30,
+                    padding: 6,
+                    borderRadius: 14,
+                    background: 'rgba(14, 28, 16, 0.98)',
+                    border: '1px solid var(--border-strong)',
+                    boxShadow: '0 16px 36px rgba(0,0,0,0.38)',
+                    display: 'grid',
+                    gap: 4,
+                  }}
+                >
+                  {CARDIO_TYPES.map(option => {
+                    const active = option === state.type
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setState(value => ({ ...value, type: option }))
+                          setPickerOpen(false)
+                        }}
+                        style={{
+                          minHeight: 40,
+                          padding: '0 12px',
+                          borderRadius: 10,
+                          border: active ? '1px solid rgba(77, 207, 160, 0.45)' : '1px solid transparent',
+                          background: active ? 'rgba(77, 207, 160, 0.16)' : 'transparent',
+                          color: active ? 'var(--accent)' : 'var(--text)',
+                          textAlign: 'left',
+                          fontSize: 15,
+                          fontWeight: active ? 600 : 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {option}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={onToggle}
