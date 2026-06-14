@@ -1212,10 +1212,10 @@
 
 .body-callout-card {
   position: absolute;
-  width: 35%;
-  max-width: 140px;
-  padding: 6px 9px;
-  border-radius: 9px;
+  width: 31.5%;
+  max-width: 126px;
+  padding: 5px 8px;
+  border-radius: 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
@@ -1224,7 +1224,7 @@
 
 .body-callout-card[data-side='left']   { left: 0; }
 .body-callout-card[data-side='right']  { right: 0; }
-.body-callout-card[data-side='bottom'] { left: 50%; transform: translateX(-50%); width: 42%; }
+.body-callout-card[data-side='bottom'] { left: 50%; transform: translateX(-50%); width: 34%; max-width: 132px; }
 
 .body-callout-card[data-active='1'] {
   border-color: var(--accent);
@@ -1236,19 +1236,19 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 6px;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-2);
   margin-bottom: 2px;
 }
 
 .body-callout-unit {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-3);
 }
 
 .body-callout-inputs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .body-callout-inputs[data-paired='1'] .body-callout-input {
@@ -1259,12 +1259,12 @@
 .body-callout-input {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 3px;
   cursor: text;
 }
 
 .body-callout-side {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-3);
   flex-shrink: 0;
 }
@@ -1276,8 +1276,9 @@
   border: 0;
   outline: none;
   color: var(--text);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
 }

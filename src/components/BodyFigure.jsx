@@ -13,15 +13,15 @@ import { BODY_FIELDS } from '../lib/bodyFields'
 // (одне для одиночних, [ліве, праве] для парних). anchor — точка на тілі (%),
 // card.side — з якого боку картка, card.top — її вертикальна позиція.
 const ZONES = [
-  { id: 'neck',   label: 'Шия',    keys: ['neck'],                  anchor: [52, 16], card: { side: 'right',  top: '7%'  } },
-  { id: 'chest',  label: 'Груди',  keys: ['chest'],                 anchor: [50, 27], card: { side: 'left',   top: '7%'  } },
-  { id: 'arm',    label: 'Руки',   keys: ['left_arm', 'right_arm'], anchor: [35, 32], card: { side: 'left',   top: '25%' } },
-  { id: 'waist',  label: 'Талія',  keys: ['waist'],                 anchor: [50, 40], card: { side: 'right',  top: '25%' } },
-  { id: 'hips',   label: 'Стегна', keys: ['hips'],                  anchor: [39, 47], card: { side: 'left',   top: '43%' } },
-  { id: 'thigh',  label: 'Стегно', keys: ['left_thigh', 'right_thigh'], anchor: [60, 55], card: { side: 'right', top: '43%' } },
-  { id: 'calf',   label: 'Литка',  keys: ['left_calf', 'right_calf'],   anchor: [41, 77], card: { side: 'left',  top: '64%' } },
-  { id: 'wrist',  label: "Зап'ясток", keys: ['wrist'],              anchor: [30, 50], card: { side: 'right',  top: '64%' } },
-  { id: 'weight', label: 'Вага',   keys: ['weight_kg'],             anchor: [50, 95], card: { side: 'bottom', top: '85%' } },
+  { id: 'neck',   label: 'Шия',       keys: ['neck'],                     anchor: [52, 16], card: { side: 'right',  top: '8%',  lineY: 13 } },
+  { id: 'chest',  label: 'Груди',     keys: ['chest'],                    anchor: [50, 27], card: { side: 'left',   top: '8%',  lineY: 13 } },
+  { id: 'arm',    label: 'Руки',      keys: ['left_arm', 'right_arm'],    anchor: [35, 32], card: { side: 'left',   top: '26%', lineY: 32 } },
+  { id: 'waist',  label: 'Талія',     keys: ['waist'],                    anchor: [50, 40], card: { side: 'right',  top: '26%', lineY: 32 } },
+  { id: 'hips',   label: 'Стегна',    keys: ['hips'],                     anchor: [39, 47], card: { side: 'left',   top: '44%', lineY: 49 } },
+  { id: 'thigh',  label: 'Стегно',    keys: ['left_thigh', 'right_thigh'], anchor: [60, 55], card: { side: 'right', top: '44%', lineY: 49 } },
+  { id: 'calf',   label: 'Литка',     keys: ['left_calf', 'right_calf'],  anchor: [41, 77], card: { side: 'left',   top: '65%', lineY: 70 } },
+  { id: 'wrist',  label: "Зап'ясток", keys: ['wrist'],                    anchor: [30, 50], card: { side: 'right',  top: '65%', lineY: 70 } },
+  { id: 'weight', label: 'Вага',      keys: ['weight_kg'],                anchor: [50, 95], card: { side: 'bottom', top: '84%', lineY: 84 } },
 ]
 
 const fieldByKey = Object.fromEntries(BODY_FIELDS.map(f => [f.key, f]))
@@ -38,8 +38,8 @@ export default function BodyFigure({ form, onChange, activeKey, onFocusField }) 
       <svg className="body-callout-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
         {ZONES.map(zone => {
           const [ax, ay] = zone.anchor
-          const cardX = zone.card.side === 'left' ? 40 : zone.card.side === 'right' ? 60 : 50
-          const cardY = parseFloat(zone.card.top) + 5
+          const cardX = zone.card.side === 'left' ? 31.5 : zone.card.side === 'right' ? 68.5 : 50
+          const cardY = zone.card.lineY ?? (parseFloat(zone.card.top) + 5)
           const active = isZoneActive(zone)
           return (
             <line
