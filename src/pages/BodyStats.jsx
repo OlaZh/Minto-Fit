@@ -2,29 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { IconArrowLeft } from '../components/Icons'
-
-const FIELDS = [
-  { key: 'weight_kg', label: 'Вага', unit: 'кг', step: 0.1 },
-  { key: 'chest', label: 'Груди', unit: 'см', step: 0.5 },
-  { key: 'waist', label: 'Талія', unit: 'см', step: 0.5 },
-  { key: 'hips', label: 'Стегна', unit: 'см', step: 0.5 },
-  { key: 'left_thigh', label: 'Ліве стегно', unit: 'см', step: 0.5 },
-  { key: 'right_thigh', label: 'Праве стегно', unit: 'см', step: 0.5 },
-  { key: 'left_calf', label: 'Литка ліва', unit: 'см', step: 0.5 },
-  { key: 'right_calf', label: 'Литка права', unit: 'см', step: 0.5 },
-  { key: 'left_arm', label: 'Рука ліва', unit: 'см', step: 0.5 },
-  { key: 'right_arm', label: 'Рука права', unit: 'см', step: 0.5 },
-  { key: 'wrist', label: 'Запʼясток', unit: 'см', step: 0.1 },
-]
-
-const CHART_FIELDS = [
-  { key: 'weight_kg', label: 'Вага' },
-  { key: 'waist', label: 'Талія' },
-  { key: 'hips', label: 'Стегна' },
-  { key: 'chest', label: 'Груди' },
-  { key: 'left_thigh', label: 'Стегно' },
-  { key: 'left_arm', label: 'Рука' },
-]
+import { BODY_FIELDS as FIELDS, CHART_FIELDS } from '../lib/bodyFields'
 
 export default function BodyStats() {
   const navigate = useNavigate()

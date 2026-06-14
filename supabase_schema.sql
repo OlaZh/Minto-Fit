@@ -162,6 +162,7 @@ create table mf_body_stats (
   user_id      uuid not null references auth.users(id) on delete cascade,
   recorded_at  timestamptz not null default now(),
   weight_kg    numeric(5,2),
+  neck         numeric(5,1),
   chest        numeric(5,1),
   waist        numeric(5,1),
   hips         numeric(5,1),

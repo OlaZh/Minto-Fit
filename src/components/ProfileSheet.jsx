@@ -1,20 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { IconX, IconBell, IconVibration, IconBrightness, IconStopwatch } from './Icons'
-
-const BODY_FIELDS = [
-  { key: 'weight_kg', label: 'Вага', unit: 'кг', step: 0.1 },
-  { key: 'chest', label: 'Груди', unit: 'см', step: 0.5 },
-  { key: 'waist', label: 'Талія', unit: 'см', step: 0.5 },
-  { key: 'hips', label: 'Стегна', unit: 'см', step: 0.5 },
-  { key: 'left_arm', label: 'Рука ліва', unit: 'см', step: 0.5 },
-  { key: 'right_arm', label: 'Рука права', unit: 'см', step: 0.5 },
-  { key: 'left_thigh', label: 'Ліве стегно', unit: 'см', step: 0.5 },
-  { key: 'right_thigh', label: 'Праве стегно', unit: 'см', step: 0.5 },
-  { key: 'left_calf', label: 'Литка ліва', unit: 'см', step: 0.5 },
-  { key: 'right_calf', label: 'Литка права', unit: 'см', step: 0.5 },
-  { key: 'wrist', label: "Зап'ясток", unit: 'см', step: 0.1 },
-]
+import { BODY_FIELDS } from '../lib/bodyFields'
 
 const GOALS = [
   { key: 'weight_loss', label: 'Схуднення' },

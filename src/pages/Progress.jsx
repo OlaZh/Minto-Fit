@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import ProfileSheet from '../components/ProfileSheet'
 import { IconUser, IconTrophy, IconX } from '../components/Icons'
+import { BODY_FIELDS } from '../lib/bodyFields'
 
 const DAY_MS = 86400000
 
@@ -15,20 +16,6 @@ function formatRecordDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
 }
 const YEAR_WEEKS = 52
-
-const BODY_FIELDS = [
-  { key: 'weight_kg', label: 'Вага', unit: 'кг' },
-  { key: 'waist', label: 'Талія', unit: 'см' },
-  { key: 'hips', label: 'Стегна', unit: 'см' },
-  { key: 'chest', label: 'Груди', unit: 'см' },
-  { key: 'left_thigh', label: 'Ліве стегно', unit: 'см' },
-  { key: 'right_thigh', label: 'Праве стегно', unit: 'см' },
-  { key: 'left_calf', label: 'Литка ліва', unit: 'см' },
-  { key: 'right_calf', label: 'Литка права', unit: 'см' },
-  { key: 'left_arm', label: 'Рука ліва', unit: 'см' },
-  { key: 'right_arm', label: 'Рука права', unit: 'см' },
-  { key: 'wrist', label: "Зап'ясток", unit: 'см' },
-]
 
 export default function Progress() {
   const [workouts, setWorkouts] = useState([])
