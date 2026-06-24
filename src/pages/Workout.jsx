@@ -7,6 +7,7 @@ import {
   clearPendingSetsForWorkout,
   getCurrentWorkout,
   getPendingFinish,
+  getPendingSetsForWorkout,
   syncPendingSetsForWorkout,
 } from '../lib/workoutStorage'
 import LoadErrorState from '../components/LoadErrorState'
@@ -174,6 +175,14 @@ export default function Workout() {
   // локального стану й pending-сетів. Не лишаємо висячих finished_at = null.
   async function cancelUnfinished() {
     if (!unfinished?.id || recovering) return
+    // Захист від випадкової втрати: якщо вже є виконані сети — DELETE каскадно
+    // знесе їх разом із записом тренування. Питаємо явне підтвердження.
+    const done = unfinished.completedSets ?? 0
+    if (done > 0 && !confirm(
+      `Буде безповоротно видалено тренування разом із ${done} виконаними підходами. Точно скасувати?`
+    )) {
+      return
+    }
     setRecovering(true)
     try {
       const { error } = await supabase
@@ -236,12 +245,24 @@ export default function Workout() {
           if (liveError) {
             console.error('unfinished workout check failed:', liveError)
           } else if (liveWorkout?.id && !liveWorkout.finished_at) {
+            // Скільки виконаних робочих сетів уже записано — щоб «Скасувати»
+            // могло попередити про втрату даних (БД + ще не синхронізовані pending).
+            const { count: dbSetCount } = await supabase
+              .from('mf_workout_sets')
+              .select('id', { count: 'exact', head: true })
+              .eq('workout_id', liveWorkout.id)
+              .eq('completed', true)
+              .gt('set_number', 0)
+            const pendingSetCount = getPendingSetsForWorkout(liveWorkout.id)
+              .filter(set => set?.completed && set?.set_number > 0).length
+
             setUnfinished({
               id: liveWorkout.id,
               programId: liveWorkout.program_id ?? current.programId,
               startedAt: liveWorkout.started_at ?? current.startedAt,
               programName: liveWorkout.program?.name ?? 'Тренування',
               color: liveWorkout.program?.color ?? '#22c55e',
+              completedSets: (dbSetCount ?? 0) + pendingSetCount,
             })
           } else {
             // Запис уже фінішований або зник у БД — локальний слід не потрібен.
